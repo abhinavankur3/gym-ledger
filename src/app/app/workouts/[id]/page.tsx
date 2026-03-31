@@ -1,8 +1,14 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, asc } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/dal";
-import { workouts, workoutSets, exercises } from "@/lib/db/schema";
+import {
+  workouts,
+  workoutSets,
+  exercises,
+  workoutTemplates,
+  workoutTemplateExercises,
+} from "@/lib/db/schema";
 import { ActiveWorkout } from "./active-workout";
 
 export default async function WorkoutDetailPage({
@@ -53,12 +59,48 @@ export default async function WorkoutDetailPage({
     setsByExercise[set.exerciseId].push(set);
   }
 
+  // Fetch template exercises if workout has a templateId
+  let templateExercises: Array<{
+    exerciseId: number;
+    name: string;
+    primaryMuscleGroup: string;
+    targetSets: number | null;
+    targetReps: string | null;
+    targetWeight: number | null;
+  }> | undefined;
+
+  if (workout.templateId) {
+    const template = await db.query.workoutTemplates.findFirst({
+      where: eq(workoutTemplates.id, workout.templateId),
+      with: {
+        exercises: {
+          with: {
+            exercise: true,
+          },
+          orderBy: [asc(workoutTemplateExercises.orderIndex)],
+        },
+      },
+    });
+
+    if (template) {
+      templateExercises = template.exercises.map((te) => ({
+        exerciseId: te.exerciseId,
+        name: te.exercise.name,
+        primaryMuscleGroup: te.exercise.primaryMuscleGroup,
+        targetSets: te.targetSets,
+        targetReps: te.targetReps,
+        targetWeight: te.targetWeight,
+      }));
+    }
+  }
+
   return (
     <ActiveWorkout
       workout={workout}
       setsByExercise={setsByExercise}
       exerciseMap={exerciseMap}
       allExercises={allExercises}
+      templateExercises={templateExercises}
     />
   );
 }

@@ -1,5 +1,5 @@
 import { sqliteTable, text, integer, real, index, uniqueIndex } from "drizzle-orm/sqlite-core";
-import { sql } from "drizzle-orm";
+import { sql, relations } from "drizzle-orm";
 
 export const users = sqliteTable("users", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -118,3 +118,40 @@ export const userPreferences = sqliteTable("user_preferences", {
   measurementUnit: text("measurement_unit", { enum: ["cm", "in"] }).notNull().default("cm"),
   theme: text("theme", { enum: ["light", "dark", "system"] }).notNull().default("dark"),
 });
+
+export const routines = sqliteTable("routines", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  isActive: integer("is_active", { mode: "boolean" }).notNull().default(false),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+  updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
+});
+
+export const routineDays = sqliteTable("routine_days", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  routineId: integer("routine_id").notNull().references(() => routines.id, { onDelete: "cascade" }),
+  dayOfWeek: integer("day_of_week").notNull(), // 0=Monday ... 6=Sunday
+  templateId: integer("template_id").notNull().references(() => workoutTemplates.id, { onDelete: "cascade" }),
+});
+
+// Drizzle relations for relational query builder
+export const workoutTemplatesRelations = relations(workoutTemplates, ({ many, one }) => ({
+  user: one(users, { fields: [workoutTemplates.userId], references: [users.id] }),
+  exercises: many(workoutTemplateExercises),
+}));
+
+export const workoutTemplateExercisesRelations = relations(workoutTemplateExercises, ({ one }) => ({
+  template: one(workoutTemplates, { fields: [workoutTemplateExercises.templateId], references: [workoutTemplates.id] }),
+  exercise: one(exercises, { fields: [workoutTemplateExercises.exerciseId], references: [exercises.id] }),
+}));
+
+export const routinesRelations = relations(routines, ({ many, one }) => ({
+  user: one(users, { fields: [routines.userId], references: [users.id] }),
+  days: many(routineDays),
+}));
+
+export const routineDaysRelations = relations(routineDays, ({ one }) => ({
+  routine: one(routines, { fields: [routineDays.routineId], references: [routines.id] }),
+  template: one(workoutTemplates, { fields: [routineDays.templateId], references: [workoutTemplates.id] }),
+}));

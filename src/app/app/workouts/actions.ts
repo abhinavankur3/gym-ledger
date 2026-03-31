@@ -1,9 +1,15 @@
 "use server";
 
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, asc, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import db from "@/lib/db";
-import { workouts, workoutSets, exercises } from "@/lib/db/schema";
+import {
+  workouts,
+  workoutSets,
+  exercises,
+  workoutTemplates,
+  workoutTemplateExercises,
+} from "@/lib/db/schema";
 import { verifySession } from "@/lib/auth/dal";
 
 export async function startWorkout(name: string) {
@@ -161,6 +167,51 @@ export async function getWorkoutHistory() {
   );
 
   return workoutsWithSets;
+}
+
+export async function startWorkoutFromTemplate(templateId: number) {
+  const session = await verifySession();
+
+  const template = await db.query.workoutTemplates.findFirst({
+    where: and(
+      eq(workoutTemplates.id, templateId),
+      eq(workoutTemplates.userId, session.userId)
+    ),
+    with: {
+      exercises: {
+        with: {
+          exercise: true,
+        },
+        orderBy: [asc(workoutTemplateExercises.orderIndex)],
+      },
+    },
+  });
+
+  if (!template) return { error: "Template not found." };
+
+  const [workout] = await db
+    .insert(workouts)
+    .values({
+      userId: session.userId,
+      name: template.name,
+      templateId: template.id,
+      startedAt: new Date().toISOString(),
+    })
+    .returning();
+
+  revalidatePath("/app/workouts");
+
+  return {
+    workoutId: workout.id,
+    templateExercises: template.exercises.map((te) => ({
+      exerciseId: te.exerciseId,
+      name: te.exercise.name,
+      primaryMuscleGroup: te.exercise.primaryMuscleGroup,
+      targetSets: te.targetSets,
+      targetReps: te.targetReps,
+      targetWeight: te.targetWeight,
+    })),
+  };
 }
 
 export async function deleteWorkout(workoutId: number) {

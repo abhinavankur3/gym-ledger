@@ -2,9 +2,11 @@ import { eq, and, gte, count, desc, sql } from "drizzle-orm";
 import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/dal";
 import { gymAttendance, workouts, bodyMetrics } from "@/lib/db/schema";
+import { getTodayTemplate } from "./routines/actions";
 import { BlurFade } from "@/components/ui/blur-fade";
 import { NumberTicker } from "@/components/ui/number-ticker";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Flame, Dumbbell, Scale, CalendarCheck } from "lucide-react";
@@ -73,6 +75,9 @@ export default async function AppDashboard() {
     }
   }
 
+  // Fetch today's template from active routine
+  const todayTemplate = await getTodayTemplate();
+
   return (
     <div className="px-4 pt-8">
       <BlurFade delay={0}>
@@ -110,6 +115,46 @@ export default async function AppDashboard() {
           </CardContent>
         </Card>
       </BlurFade>
+
+      {/* Today's Workout Card */}
+      {todayTemplate && (
+        <BlurFade delay={0.15}>
+          <Card className="mt-4 surface border-white/10 rounded-2xl overflow-hidden">
+            <CardContent className="p-5">
+              <p className="text-xs text-muted-foreground">
+                Today&apos;s workout
+              </p>
+              <p className="font-semibold mt-1">{todayTemplate.name}</p>
+              <div className="flex gap-1 mt-2 flex-wrap">
+                {todayTemplate.exercises.slice(0, 3).map((ex) => (
+                  <Badge
+                    key={ex.exerciseId}
+                    variant="outline"
+                    className="text-[9px] border-white/10"
+                  >
+                    {ex.name}
+                  </Badge>
+                ))}
+                {todayTemplate.exercises.length > 3 && (
+                  <Badge
+                    variant="outline"
+                    className="text-[9px] border-white/10"
+                  >
+                    +{todayTemplate.exercises.length - 3} more
+                  </Badge>
+                )}
+              </div>
+              <Link
+                href={`/app/workouts/new?templateId=${todayTemplate.id}`}
+              >
+                <Button className="mt-3 w-full rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90">
+                  Start {todayTemplate.name}
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </BlurFade>
+      )}
 
       {/* Stats Row */}
       <BlurFade delay={0.2}>
@@ -167,12 +212,18 @@ export default async function AppDashboard() {
               {activeCheckIn ? "Check Out" : "Check In"}
             </Button>
           </Link>
-          <Link href="/app/workouts/new">
+          <Link
+            href={
+              todayTemplate
+                ? `/app/workouts/new?templateId=${todayTemplate.id}`
+                : "/app/workouts/new"
+            }
+          >
             <Button
               className="w-full h-14 rounded-2xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90"
             >
               <Dumbbell className="h-4 w-4 mr-2" />
-              Start Workout
+              {todayTemplate ? todayTemplate.name : "Start Workout"}
             </Button>
           </Link>
         </div>

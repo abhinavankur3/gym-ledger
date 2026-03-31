@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { Plus, Dumbbell, Clock } from "lucide-react";
+import { Plus, Dumbbell, Clock, FileText, CalendarDays } from "lucide-react";
 
 const MUSCLE_GROUP_COLORS: Record<string, string> = {
   chest: "bg-rose-500/20 text-rose-400 border-rose-500/30",
@@ -44,6 +44,27 @@ export default async function WorkoutsPage() {
             className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground"
           >
             <Plus className="h-5 w-5" />
+          </Link>
+        </div>
+      </BlurFade>
+
+      <BlurFade delay={0.05}>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <Link href="/app/workouts/templates">
+            <Card className="surface border-white/10 rounded-2xl hover:bg-white/5 transition-colors">
+              <CardContent className="p-4 flex items-center gap-3">
+                <FileText className="h-5 w-5 text-primary" />
+                <span className="font-medium text-sm">Templates</span>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/app/routines">
+            <Card className="surface border-white/10 rounded-2xl hover:bg-white/5 transition-colors">
+              <CardContent className="p-4 flex items-center gap-3">
+                <CalendarDays className="h-5 w-5 text-primary" />
+                <span className="font-medium text-sm">Routines</span>
+              </CardContent>
+            </Card>
           </Link>
         </div>
       </BlurFade>

@@ -7,12 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { ExercisePicker } from "@/components/exercise-picker";
 import { BlurFade } from "@/components/ui/blur-fade";
 import {
   Select,
@@ -22,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { Plus, Trash2, Trophy, Check, Search } from "lucide-react";
+import { Plus, Trash2, Trophy, Check } from "lucide-react";
 import { toast } from "sonner";
 
 const MUSCLE_GROUP_COLORS: Record<string, string> = {
@@ -60,6 +55,15 @@ type WorkoutSet = {
   completedAt: string;
 };
 
+type TemplateExercise = {
+  exerciseId: number;
+  name: string;
+  primaryMuscleGroup: string;
+  targetSets: number | null;
+  targetReps: string | null;
+  targetWeight: number | null;
+};
+
 type Props = {
   workout: {
     id: number;
@@ -70,6 +74,7 @@ type Props = {
   setsByExercise: Record<number, WorkoutSet[]>;
   exerciseMap: Record<number, Exercise>;
   allExercises: Exercise[];
+  templateExercises?: TemplateExercise[];
 };
 
 export function ActiveWorkout({
@@ -77,11 +82,11 @@ export function ActiveWorkout({
   setsByExercise,
   exerciseMap,
   allExercises,
+  templateExercises,
 }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const isCompleted = !!workout.completedAt;
 
   // New set form state per exercise
@@ -90,7 +95,24 @@ export function ActiveWorkout({
   >({});
 
   function getNewSet(exerciseId: number) {
-    return newSets[exerciseId] || { weight: "", reps: "", setType: "working" };
+    if (newSets[exerciseId]) return newSets[exerciseId];
+
+    // Pre-fill from template targets if available
+    const te = templateExercises?.find((t) => t.exerciseId === exerciseId);
+    if (te) {
+      const repsDefault = te.targetReps
+        ? te.targetReps.includes("-")
+          ? te.targetReps.split("-")[1]
+          : te.targetReps
+        : "";
+      return {
+        weight: te.targetWeight ? String(te.targetWeight) : "",
+        reps: repsDefault,
+        setType: "working",
+      };
+    }
+
+    return { weight: "", reps: "", setType: "working" };
   }
 
   function updateNewSet(
@@ -148,13 +170,6 @@ export function ActiveWorkout({
   }
 
   function handlePickExercise(exerciseId: number) {
-    // Initialize the new set state for this exercise
-    if (!setsByExercise[exerciseId]) {
-      // Force a page refresh to include this exercise
-    }
-    setPickerOpen(false);
-    setSearchQuery("");
-
     // Add an empty set to trigger the exercise appearing
     startTransition(async () => {
       await addSet(workout.id, exerciseId, {
@@ -165,23 +180,32 @@ export function ActiveWorkout({
     });
   }
 
-  const exerciseIds = Object.keys(setsByExercise).map(Number);
+  // Build the list of exercise IDs to display
+  const loggedExerciseIds = Object.keys(setsByExercise).map(Number);
 
-  const filteredExercises = allExercises.filter(
-    (e) =>
-      !searchQuery ||
-      e.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Ghost exercises from template that haven't been logged yet
+  const ghostExercises: TemplateExercise[] = [];
+  if (templateExercises && loggedExerciseIds.length === 0) {
+    // Fresh workout: show all template exercises as ghosts
+    for (const te of templateExercises) {
+      if (!loggedExerciseIds.includes(te.exerciseId)) {
+        ghostExercises.push(te);
+      }
+    }
+  } else if (templateExercises) {
+    // Partially started: show remaining template exercises as ghosts
+    for (const te of templateExercises) {
+      if (!loggedExerciseIds.includes(te.exerciseId)) {
+        ghostExercises.push(te);
+      }
+    }
+  }
 
-  const groupedFiltered = filteredExercises.reduce(
-    (acc, e) => {
-      const key = e.primaryMuscleGroup;
-      if (!acc[key]) acc[key] = [];
-      acc[key].push(e);
-      return acc;
-    },
-    {} as Record<string, Exercise[]>
-  );
+  // All exercise IDs to render (logged first, then ghosts)
+  const allDisplayIds = [
+    ...loggedExerciseIds,
+    ...ghostExercises.map((g) => g.exerciseId),
+  ];
 
   return (
     <div className="px-4 pt-8 pb-24">
@@ -205,27 +229,62 @@ export function ActiveWorkout({
 
       {/* Exercise sections */}
       <div className="mt-6 space-y-4">
-        {exerciseIds.map((exerciseId, i) => {
+        {allDisplayIds.map((exerciseId, i) => {
           const exercise = exerciseMap[exerciseId];
           const sets = setsByExercise[exerciseId] || [];
-          if (!exercise) return null;
+          const isGhost = !loggedExerciseIds.includes(exerciseId);
+          const ghostData = ghostExercises.find(
+            (g) => g.exerciseId === exerciseId
+          );
+
+          // For ghost exercises, use template data for display
+          const displayName = exercise?.name ?? ghostData?.name ?? "Unknown";
+          const displayMuscle =
+            exercise?.primaryMuscleGroup ??
+            ghostData?.primaryMuscleGroup ??
+            "";
 
           return (
             <BlurFade key={exerciseId} delay={0.05 * (i + 1)}>
-              <Card className="surface border-white/10 rounded-2xl">
+              <Card
+                className={cn(
+                  "surface rounded-2xl",
+                  isGhost
+                    ? "border-dashed border-white/10"
+                    : "border-white/10"
+                )}
+              >
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">{exercise.name}</CardTitle>
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "text-[9px]",
-                        MUSCLE_GROUP_COLORS[exercise.primaryMuscleGroup]
+                    <CardTitle className="text-base">
+                      {displayName}
+                      {isGhost && (
+                        <span className="text-xs text-muted-foreground ml-2">
+                          (planned)
+                        </span>
                       )}
-                    >
-                      {exercise.primaryMuscleGroup.replace("_", " ")}
-                    </Badge>
+                    </CardTitle>
+                    {displayMuscle && (
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "text-[9px]",
+                          MUSCLE_GROUP_COLORS[displayMuscle]
+                        )}
+                      >
+                        {displayMuscle.replace("_", " ")}
+                      </Badge>
+                    )}
                   </div>
+                  {isGhost && ghostData && (
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Target: {ghostData.targetSets ?? 3} sets x{" "}
+                      {ghostData.targetReps ?? "?"} reps
+                      {ghostData.targetWeight
+                        ? ` @ ${ghostData.targetWeight}kg`
+                        : ""}
+                    </p>
+                  )}
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {/* Set headers */}
@@ -301,9 +360,10 @@ export function ActiveWorkout({
                       />
                       <Select
                         value={getNewSet(exerciseId).setType}
-                        onValueChange={(v) =>
-                          v && updateNewSet(exerciseId, "setType", v)
-                        }
+                        onValueChange={(v) => {
+                          if (!v) return;
+                          updateNewSet(exerciseId, "setType", v);
+                        }}
                       >
                         <SelectTrigger className="h-9 rounded-lg bg-white/5 border-white/10 text-xs">
                           <SelectValue />
@@ -345,7 +405,7 @@ export function ActiveWorkout({
 
           <Button
             onClick={handleComplete}
-            disabled={pending || exerciseIds.length === 0}
+            disabled={pending || (loggedExerciseIds.length === 0)}
             className="w-full h-14 rounded-2xl bg-primary text-primary-foreground font-bold text-base hover:bg-primary/90"
           >
             {pending ? "Finishing..." : "Finish Workout"}
@@ -353,57 +413,13 @@ export function ActiveWorkout({
         </div>
       )}
 
-      {/* Exercise Picker Sheet */}
-      <Sheet open={pickerOpen} onOpenChange={setPickerOpen}>
-        <SheetContent
-          side="bottom"
-          className="surface border-white/10 rounded-t-2xl h-[70vh]"
-        >
-          <SheetHeader>
-            <SheetTitle>Add Exercise</SheetTitle>
-          </SheetHeader>
-          <div className="mt-4 space-y-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search exercises..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 h-11 rounded-xl bg-white/5 border-white/10"
-                autoFocus
-              />
-            </div>
-            <div className="overflow-y-auto max-h-[calc(70vh-10rem)] space-y-3">
-              {Object.entries(groupedFiltered)
-                .sort(([a], [b]) => a.localeCompare(b))
-                .map(([group, items]) => (
-                  <div key={group}>
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
-                      {group.replace("_", " ")}
-                    </p>
-                    {items.map((exercise) => (
-                      <button
-                        key={exercise.id}
-                        onClick={() => handlePickExercise(exercise.id)}
-                        className="w-full text-left rounded-xl p-3 hover:bg-white/5 transition-colors flex items-center justify-between"
-                      >
-                        <span className="text-sm font-medium">
-                          {exercise.name}
-                        </span>
-                        <Badge
-                          variant="outline"
-                          className="text-[9px] border-white/10"
-                        >
-                          {exercise.category}
-                        </Badge>
-                      </button>
-                    ))}
-                  </div>
-                ))}
-            </div>
-          </div>
-        </SheetContent>
-      </Sheet>
+      {/* Exercise Picker */}
+      <ExercisePicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        onSelect={handlePickExercise}
+        exercises={allExercises}
+      />
     </div>
   );
 }
