@@ -1,6 +1,6 @@
 services:
   gym-ledger:
-    build: .
+    image: ghcr.io/abhinavankur3/gym-ledger:latest
     ports:
       - "3000:3000"
     environment:

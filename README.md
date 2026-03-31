@@ -64,15 +64,17 @@ Open [http://localhost:3000](http://localhost:3000) and sign in with your admin 
 
 ## Self-Hosting with Docker
 
+Pre-built images are published to GitHub Container Registry on every push to `main`.
+
 ```bash
 # Generate a session secret
 export SESSION_SECRET=$(openssl rand -base64 32)
 
-# Start the container
+# Run with docker compose (recommended)
+curl -O https://raw.githubusercontent.com/abhinavankur3/gym-ledger/main/docker-compose.yml
 docker compose up -d
 
-# Or build and run manually
-docker build -t gym-ledger .
+# Or run the image directly
 docker run -d \
   -p 3000:3000 \
   -e DATABASE_URL=file:/app/data/gym-ledger.db \
@@ -80,7 +82,7 @@ docker run -d \
   -e ADMIN_PASSWORD=changeme \
   -e SESSION_SECRET=$SESSION_SECRET \
   -v gym-data:/app/data \
-  gym-ledger
+  ghcr.io/abhinavankur3/gym-ledger:latest
 ```
 
 The app will be available at `http://localhost:3000`. Data is persisted in the `gym-data` Docker volume.
