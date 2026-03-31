@@ -30,12 +30,21 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       caches
         .match(request)
-        .then((cached) => cached || fetch(request).then((res) => {
-          const clone = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-          return res;
-        }))
+        .then(
+          (cached) =>
+            cached ||
+            fetch(request).then((res) => {
+              const clone = res.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+              return res;
+            })
+        )
     );
+    return;
   }
-  // Network-first for everything else
+
+  // Network-first for navigation and API requests
+  event.respondWith(
+    fetch(request).catch(() => caches.match(request))
+  );
 });
