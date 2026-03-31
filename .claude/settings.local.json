@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(npx:*)",
-      "Bash(yes \"\")"
+      "Bash(yes \"\")",
+      "Bash(npm install:*)"
     ]
   }
 }
