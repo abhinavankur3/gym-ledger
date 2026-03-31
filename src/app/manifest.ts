@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Track your gym attendance, workouts, and body metrics",
     start_url: "/app",
     display: "standalone",
-    background_color: "#1a1625",
-    theme_color: "#1a1625",
+    background_color: "#252330",
+    theme_color: "#252330",
     orientation: "portrait",
     icons: [
       {
