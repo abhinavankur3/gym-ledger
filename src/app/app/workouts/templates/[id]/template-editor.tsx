@@ -8,6 +8,7 @@ import {
   removeTemplateExercise,
   moveTemplateExercise,
   deleteTemplate,
+  renameTemplate,
 } from "../actions";
 import { ExercisePicker } from "@/components/exercise-picker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +23,8 @@ import {
   ChevronUp,
   ChevronDown,
   ArrowLeft,
+  Pencil,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -79,6 +82,22 @@ export function TemplateEditor({ template, allExercises }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(template.name);
+
+  function handleRename() {
+    if (!name.trim() || name.trim() === template.name) {
+      setName(template.name);
+      setEditing(false);
+      return;
+    }
+    startTransition(async () => {
+      await renameTemplate(template.id, name.trim());
+      toast.success("Template renamed");
+      setEditing(false);
+      router.refresh();
+    });
+  }
 
   function handleAddExercise(exerciseId: number) {
     startTransition(async () => {
@@ -130,13 +149,39 @@ export function TemplateEditor({ template, allExercises }: Props) {
         <div className="flex items-center gap-3 mb-6">
           <Link
             href="/app/workouts/templates"
-            className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 border border-white/10"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/5 border border-white/10"
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
-          <h1 className="text-2xl font-bold tracking-tight">
-            {template.name}
-          </h1>
+          {editing ? (
+            <div className="flex items-center gap-2 flex-1">
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleRename()}
+                autoFocus
+                className="h-9 rounded-xl bg-white/5 border-white/10 text-lg font-bold"
+              />
+              <button
+                onClick={handleRename}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground"
+              >
+                <Check className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <h1 className="text-2xl font-bold tracking-tight truncate">
+                {template.name}
+              </h1>
+              <button
+                onClick={() => setEditing(true)}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
         </div>
       </BlurFade>
 

@@ -67,34 +67,62 @@ export default async function ChartsPage() {
     .map(([muscle, volume]) => ({ muscle: muscle.replace("_", " "), volume: Math.round(volume) }))
     .sort((a, b) => b.volume - a.volume);
 
-  // All exercises for PR chart
-  const allExercises = await db.query.exercises.findMany({
-    orderBy: (e, { asc }) => [asc(e.name)],
-  });
-
-  // PR data for all exercises
-  const prData: Record<number, { date: string; weight: number }[]> = {};
+  // PR data — only for exercises the user has actually logged
   const userWorkouts = await db.query.workouts.findMany({
     where: eq(workouts.userId, user.id),
   });
   const workoutIds = userWorkouts.map((w) => w.id);
 
+  const prExercises: Array<{
+    exerciseId: number;
+    exerciseName: string;
+    bestWeight: number;
+    bestDate: string;
+    history: Array<{ date: string; weight: number }>;
+  }> = [];
+
   if (workoutIds.length > 0) {
-    const allSets = await db.query.workoutSets.findMany({
+    // Get all sets with weight for this user's workouts
+    const prSets = await db.query.workoutSets.findMany({
       where: eq(workoutSets.isPr, true),
     });
 
-    for (const set of allSets) {
-      if (!workoutIds.includes(set.workoutId)) continue;
-      if (!set.weight) continue;
+    const byExercise: Record<number, { date: string; weight: number }[]> = {};
+    for (const set of prSets) {
+      if (!workoutIds.includes(set.workoutId) || !set.weight) continue;
       const workout = userWorkouts.find((w) => w.id === set.workoutId);
       if (!workout) continue;
-      if (!prData[set.exerciseId]) prData[set.exerciseId] = [];
-      prData[set.exerciseId].push({
+      if (!byExercise[set.exerciseId]) byExercise[set.exerciseId] = [];
+      byExercise[set.exerciseId].push({
         date: workout.startedAt.split("T")[0],
         weight: set.weight,
       });
     }
+
+    // Build sorted PR list with exercise names
+    for (const [exerciseIdStr, history] of Object.entries(byExercise)) {
+      const exerciseId = Number(exerciseIdStr);
+      const exercise = await db.query.exercises.findFirst({
+        where: eq(exercises.id, exerciseId),
+      });
+      if (!exercise) continue;
+
+      const sorted = history.sort(
+        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+      );
+      const best = sorted.reduce((max, h) => (h.weight > max.weight ? h : max), sorted[0]);
+
+      prExercises.push({
+        exerciseId,
+        exerciseName: exercise.name,
+        bestWeight: best.weight,
+        bestDate: best.date,
+        history: sorted,
+      });
+    }
+
+    // Sort by best weight descending
+    prExercises.sort((a, b) => b.bestWeight - a.bestWeight);
   }
 
   return (
@@ -106,10 +134,9 @@ export default async function ChartsPage() {
       <BlurFade delay={0.1}>
         <ChartsClient
           weightData={weightData.map((w) => ({ date: w.date, value: w.value, unit: w.unit }))}
-          attendanceData={attendanceData.map((a) => ({ date: a.checkIn.split("T")[0] }))}
+          attendanceData={attendanceData.filter((a) => a.checkIn).map((a) => ({ date: a.checkIn.split("T")[0] }))}
           volumeData={volumeData}
-          exercises={allExercises.map((e) => ({ id: e.id, name: e.name }))}
-          prData={prData}
+          prExercises={prExercises}
         />
       </BlurFade>
     </div>

@@ -95,6 +95,25 @@ export async function createTemplate(formData: FormData) {
   return { templateId: template.id };
 }
 
+export async function renameTemplate(templateId: number, name: string) {
+  const session = await verifySession();
+  if (!name?.trim()) return { error: "Name is required." };
+
+  await db
+    .update(workoutTemplates)
+    .set({ name: name.trim(), updatedAt: new Date().toISOString() })
+    .where(
+      and(
+        eq(workoutTemplates.id, templateId),
+        eq(workoutTemplates.userId, session.userId)
+      )
+    );
+
+  revalidatePath("/app/workouts/templates");
+  revalidatePath(`/app/workouts/templates/${templateId}`);
+  return { success: true };
+}
+
 export async function deleteTemplate(templateId: number) {
   const session = await verifySession();
 

@@ -2,8 +2,6 @@
 
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
-
 import { cn } from "@/lib/utils";
 import {
   LineChart,
@@ -16,58 +14,33 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { Scale, Activity, CalendarCheck, Trophy } from "lucide-react";
+import { Scale, Activity, CalendarCheck, Trophy, ChevronRight } from "lucide-react";
 
 type WeightEntry = { date: string; value: number; unit: string };
 type AttendanceEntry = { date: string };
 type VolumeEntry = { muscle: string; volume: number };
-type ExerciseOption = { id: number; name: string };
-type PREntry = { date: string; weight: number };
+type PRExercise = {
+  exerciseId: number;
+  exerciseName: string;
+  bestWeight: number;
+  bestDate: string;
+  history: Array<{ date: string; weight: number }>;
+};
 
 type Props = {
   weightData: WeightEntry[];
   attendanceData: AttendanceEntry[];
   volumeData: VolumeEntry[];
-  exercises: ExerciseOption[];
-  prData: Record<number, PREntry[]>;
-};
-
-const VOLUME_COLORS: Record<string, string> = {
-  chest: "#fb7185",
-  back: "#60a5fa",
-  shoulders: "#fbbf24",
-  biceps: "#a78bfa",
-  triceps: "#a78bfa",
-  quads: "#34d399",
-  hamstrings: "#34d399",
-  glutes: "#34d399",
-  calves: "#34d399",
-  core: "#fb923c",
-  forearms: "#a78bfa",
-  "full body": "#22d3ee",
+  prExercises: PRExercise[];
 };
 
 export function ChartsClient({
-  weightData,
-  attendanceData,
-  volumeData,
-  exercises,
-  prData,
+  weightData = [],
+  attendanceData = [],
+  volumeData = [],
+  prExercises = [],
 }: Props) {
-  const [selectedExerciseId, setSelectedExerciseId] = useState<number>(
-    exercises[0]?.id || 0
-  );
-
-  const prChartData = useMemo(() => {
-    return (prData[selectedExerciseId] || []).sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
-  }, [selectedExerciseId, prData]);
-
-  const selectedExerciseName = useMemo(
-    () => exercises.find((e) => e.id === selectedExerciseId)?.name || "Select exercise",
-    [selectedExerciseId, exercises]
-  );
+  const [expandedPr, setExpandedPr] = useState<number | null>(null);
 
   // Attendance heatmap data
   const heatmapData = useMemo(() => {
@@ -80,7 +53,7 @@ export function ChartsClient({
     let currentWeek: { date: string; attended: boolean }[] = [];
     const cursor = new Date(start);
 
-    while (cursor <= today) {
+    while (cursor.getTime() <= today.getTime()) {
       const dateStr = cursor.toISOString().split("T")[0];
       currentWeek.push({ date: dateStr, attended: dates.has(dateStr) });
       if (cursor.getDay() === 0 || cursor.getTime() === today.getTime()) {
@@ -218,9 +191,7 @@ export function ChartsClient({
                     title={day.date}
                     className={cn(
                       "h-3 w-3 rounded-sm transition-colors",
-                      day.attended
-                        ? "bg-emerald-500"
-                        : "bg-white/5"
+                      day.attended ? "bg-emerald-500" : "bg-white/5"
                     )}
                   />
                 ))}
@@ -237,58 +208,111 @@ export function ChartsClient({
         </CardContent>
       </Card>
 
-      {/* PR Progression */}
+      {/* Personal Records */}
       <Card className="surface border-white/10 rounded-2xl">
         <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Trophy className="h-4 w-4 text-amber-400" />
-              PR Progression
-            </CardTitle>
-          </div>
-          <select
-            value={selectedExerciseId}
-            onChange={(e) => setSelectedExerciseId(Number(e.target.value))}
-            className="mt-2 h-9 w-full rounded-xl bg-white/5 border border-white/10 px-3 text-xs text-foreground outline-none"
-          >
-            {exercises.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.name}
-              </option>
-            ))}
-          </select>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Trophy className="h-4 w-4 text-amber-400" />
+            Personal Records
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          {prChartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={prChartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fontSize: 10, fill: "rgba(255,255,255,0.4)" }}
-                  tickFormatter={(d) => new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                />
-                <YAxis tick={{ fontSize: 10, fill: "rgba(255,255,255,0.4)" }} />
-                <Tooltip
-                  contentStyle={{
-                    background: "rgba(0,0,0,0.8)",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    borderRadius: "12px",
-                    fontSize: "12px",
-                  }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="weight"
-                  stroke="#fbbf24"
-                  strokeWidth={2}
-                  dot={{ r: 4, fill: "#fbbf24" }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+          {prExercises.length > 0 ? (
+            <div className="space-y-2">
+              {prExercises.map((pr) => (
+                <div key={pr.exerciseId}>
+                  <button
+                    onClick={() =>
+                      setExpandedPr(
+                        expandedPr === pr.exerciseId ? null : pr.exerciseId
+                      )
+                    }
+                    className={cn(
+                      "w-full flex items-center justify-between rounded-xl p-3 transition-colors text-left",
+                      expandedPr === pr.exerciseId
+                        ? "bg-primary/10"
+                        : "hover:bg-white/5"
+                    )}
+                  >
+                    <div>
+                      <p className="text-sm font-medium">{pr.exerciseName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(pr.bestDate).toLocaleDateString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg font-bold text-primary">
+                        {pr.bestWeight}
+                        <span className="text-xs font-normal text-muted-foreground ml-0.5">
+                          kg
+                        </span>
+                      </span>
+                      <ChevronRight
+                        className={cn(
+                          "h-4 w-4 text-muted-foreground transition-transform",
+                          expandedPr === pr.exerciseId && "rotate-90"
+                        )}
+                      />
+                    </div>
+                  </button>
+
+                  {expandedPr === pr.exerciseId && pr.history.length > 1 && (
+                    <div className="mt-2 px-1 pb-2">
+                      <ResponsiveContainer width="100%" height={150}>
+                        <LineChart data={pr.history}>
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            stroke="rgba(255,255,255,0.05)"
+                          />
+                          <XAxis
+                            dataKey="date"
+                            tick={{
+                              fontSize: 9,
+                              fill: "rgba(255,255,255,0.4)",
+                            }}
+                            tickFormatter={(d) =>
+                              new Date(d).toLocaleDateString(undefined, {
+                                month: "short",
+                                day: "numeric",
+                              })
+                            }
+                          />
+                          <YAxis
+                            tick={{
+                              fontSize: 9,
+                              fill: "rgba(255,255,255,0.4)",
+                            }}
+                            domain={["dataMin - 5", "dataMax + 5"]}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              background: "rgba(0,0,0,0.8)",
+                              border: "1px solid rgba(255,255,255,0.1)",
+                              borderRadius: "12px",
+                              fontSize: "12px",
+                            }}
+                            formatter={(value) => [`${value} kg`, "PR"]}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="weight"
+                            stroke="#fbbf24"
+                            strokeWidth={2}
+                            dot={{ r: 3, fill: "#fbbf24" }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           ) : (
-            <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">
-              No PR data for this exercise yet
+            <div className="flex items-center justify-center h-24 text-sm text-muted-foreground">
+              Log some sets to see your PRs
             </div>
           )}
         </CardContent>
