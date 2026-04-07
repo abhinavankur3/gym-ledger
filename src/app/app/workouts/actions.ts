@@ -37,6 +37,7 @@ export async function addSet(
     reps?: number;
     weight?: number;
     rpe?: number;
+    durationSeconds?: number;
   }
 ) {
   const session = await verifySession();
@@ -76,6 +77,7 @@ export async function addSet(
     setType: data.setType,
     reps: data.reps ?? null,
     weight: data.weight ?? null,
+    durationSeconds: data.durationSeconds ?? null,
     rpe: data.rpe ?? null,
     isPr,
     completedAt: new Date().toISOString(),
@@ -106,6 +108,34 @@ export async function deleteSet(setId: number) {
 
   await db.delete(workoutSets).where(eq(workoutSets.id, setId));
   revalidatePath(`/app/workouts/${set.workoutId}`);
+  return { success: true };
+}
+
+export async function removeExerciseFromWorkout(
+  workoutId: number,
+  exerciseId: number
+) {
+  const session = await verifySession();
+
+  const workout = await db.query.workouts.findFirst({
+    where: and(
+      eq(workouts.id, workoutId),
+      eq(workouts.userId, session.userId)
+    ),
+  });
+
+  if (!workout) return { error: "Workout not found." };
+
+  await db
+    .delete(workoutSets)
+    .where(
+      and(
+        eq(workoutSets.workoutId, workoutId),
+        eq(workoutSets.exerciseId, exerciseId)
+      )
+    );
+
+  revalidatePath(`/app/workouts/${workoutId}`);
   return { success: true };
 }
 

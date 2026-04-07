@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { addSet, deleteSet, completeWorkout } from "../actions";
+import { addSet, deleteSet, removeExerciseFromWorkout, completeWorkout } from "../actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { Plus, Trash2, Trophy, Check } from "lucide-react";
+import { Plus, Trash2, Trophy, Check, CheckCircle, X } from "lucide-react";
 import { toast } from "sonner";
 
 const MUSCLE_GROUP_COLORS: Record<string, string> = {
@@ -50,10 +50,34 @@ type WorkoutSet = {
   setType: string;
   reps: number | null;
   weight: number | null;
+  durationSeconds: number | null;
   rpe: number | null;
   isPr: boolean;
   completedAt: string;
 };
+
+// Exercises where we log duration instead of weight/reps
+function isDurationExercise(category: string, name?: string) {
+  if (category === "cardio") return true;
+  // Timed bodyweight exercises
+  const timedExercises = ["plank", "dead bug"];
+  if (name && timedExercises.includes(name.toLowerCase())) return true;
+  return false;
+}
+
+function formatDurationDisplay(seconds: number) {
+  if (seconds >= 3600) {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    return `${h}h ${m}m`;
+  }
+  if (seconds >= 60) {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return s > 0 ? `${m}m ${s}s` : `${m}m`;
+  }
+  return `${seconds}s`;
+}
 
 type TemplateExercise = {
   exerciseId: number;
@@ -87,11 +111,12 @@ export function ActiveWorkout({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [addedExerciseIds, setAddedExerciseIds] = useState<number[]>([]);
   const isCompleted = !!workout.completedAt;
 
   // New set form state per exercise
   const [newSets, setNewSets] = useState<
-    Record<number, { weight: string; reps: string; setType: string }>
+    Record<number, { weight: string; reps: string; duration: string; setType: string }>
   >({});
 
   function getNewSet(exerciseId: number) {
@@ -108,11 +133,12 @@ export function ActiveWorkout({
       return {
         weight: te.targetWeight ? String(te.targetWeight) : "",
         reps: repsDefault,
+        duration: "",
         setType: "working",
       };
     }
 
-    return { weight: "", reps: "", setType: "working" };
+    return { weight: "", reps: "", duration: "", setType: "working" };
   }
 
   function updateNewSet(
@@ -136,6 +162,7 @@ export function ActiveWorkout({
         setType: setData.setType as "warmup" | "working" | "dropset" | "failure",
         reps: setData.reps ? Number(setData.reps) : undefined,
         weight: setData.weight ? Number(setData.weight) : undefined,
+        durationSeconds: setData.duration ? Number(setData.duration) * 60 : undefined,
       });
 
       if (result?.isPr) {
@@ -147,7 +174,7 @@ export function ActiveWorkout({
       // Reset form for this exercise
       setNewSets((prev) => ({
         ...prev,
-        [exerciseId]: { weight: "", reps: "", setType: "working" },
+        [exerciseId]: { weight: "", reps: "", duration: "", setType: "working" },
       }));
 
       router.refresh();
@@ -161,6 +188,20 @@ export function ActiveWorkout({
     });
   }
 
+  function handleRemoveExercise(exerciseId: number) {
+    if (!confirm("Remove this exercise and all its sets?")) return;
+    const hasSets = (setsByExercise[exerciseId] || []).length > 0;
+    if (hasSets) {
+      startTransition(async () => {
+        await removeExerciseFromWorkout(workout.id, exerciseId);
+        setAddedExerciseIds((prev) => prev.filter((id) => id !== exerciseId));
+        router.refresh();
+      });
+    } else {
+      setAddedExerciseIds((prev) => prev.filter((id) => id !== exerciseId));
+    }
+  }
+
   function handleComplete() {
     startTransition(async () => {
       await completeWorkout(workout.id);
@@ -170,14 +211,10 @@ export function ActiveWorkout({
   }
 
   function handlePickExercise(exerciseId: number) {
-    // Add an empty set to trigger the exercise appearing
-    startTransition(async () => {
-      await addSet(workout.id, exerciseId, {
-        setNumber: 1,
-        setType: "working",
-      });
-      router.refresh();
-    });
+    setAddedExerciseIds((prev) =>
+      prev.includes(exerciseId) ? prev : [...prev, exerciseId]
+    );
+    setPickerOpen(false);
   }
 
   // Build the list of exercise IDs to display
@@ -201,10 +238,15 @@ export function ActiveWorkout({
     }
   }
 
-  // All exercise IDs to render (logged first, then ghosts)
+  // All exercise IDs to render (logged first, then ghosts, then manually added)
   const allDisplayIds = [
     ...loggedExerciseIds,
     ...ghostExercises.map((g) => g.exerciseId),
+    ...addedExerciseIds.filter(
+      (id) =>
+        !loggedExerciseIds.includes(id) &&
+        !ghostExercises.some((g) => g.exerciseId === id)
+    ),
   ];
 
   return (
@@ -224,20 +266,31 @@ export function ActiveWorkout({
               {isCompleted && " · Completed"}
             </p>
           </div>
+          {!isCompleted && (
+            <Button
+              onClick={handleComplete}
+              disabled={pending || loggedExerciseIds.length === 0}
+              size="sm"
+              className="rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 gap-1.5"
+            >
+              <CheckCircle className="h-4 w-4" />
+              Finish
+            </Button>
+          )}
         </div>
       </BlurFade>
 
       {/* Exercise sections */}
       <div className="mt-6 space-y-4">
         {allDisplayIds.map((exerciseId, i) => {
-          const exercise = exerciseMap[exerciseId];
+          const exercise = exerciseMap[exerciseId] ?? allExercises.find((e) => e.id === exerciseId);
           const sets = setsByExercise[exerciseId] || [];
           const isGhost = !loggedExerciseIds.includes(exerciseId);
           const ghostData = ghostExercises.find(
             (g) => g.exerciseId === exerciseId
           );
 
-          // For ghost exercises, use template data for display
+          // For ghost/added exercises, use template data or allExercises for display
           const displayName = exercise?.name ?? ghostData?.name ?? "Unknown";
           const displayMuscle =
             exercise?.primaryMuscleGroup ??
@@ -255,8 +308,8 @@ export function ActiveWorkout({
                 )}
               >
                 <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">
+                  <div className="flex items-center justify-between gap-2">
+                    <CardTitle className="text-base flex-1 min-w-0 truncate">
                       {displayName}
                       {isGhost && (
                         <span className="text-xs text-muted-foreground ml-2">
@@ -264,17 +317,28 @@ export function ActiveWorkout({
                         </span>
                       )}
                     </CardTitle>
-                    {displayMuscle && (
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "text-[9px]",
-                          MUSCLE_GROUP_COLORS[displayMuscle]
-                        )}
-                      >
-                        {displayMuscle.replace("_", " ")}
-                      </Badge>
-                    )}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {displayMuscle && (
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-[9px]",
+                            MUSCLE_GROUP_COLORS[displayMuscle]
+                          )}
+                        >
+                          {displayMuscle.replace("_", " ")}
+                        </Badge>
+                      )}
+                      {!isCompleted && (
+                        <button
+                          onClick={() => handleRemoveExercise(exerciseId)}
+                          disabled={pending}
+                          className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:text-destructive transition-colors"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                   {isGhost && ghostData && (
                     <p className="text-[10px] text-muted-foreground mt-1">
@@ -287,103 +351,181 @@ export function ActiveWorkout({
                   )}
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  {/* Set headers */}
-                  {sets.length > 0 && (
-                    <div className="grid grid-cols-[2rem_1fr_1fr_1fr_2rem] gap-2 text-[10px] text-muted-foreground uppercase tracking-wider px-1">
-                      <span>Set</span>
-                      <span>Weight</span>
-                      <span>Reps</span>
-                      <span>Type</span>
-                      <span />
-                    </div>
-                  )}
+                  {(() => {
+                    const exerciseCategory = exercise?.category ?? ghostData?.primaryMuscleGroup ?? "";
+                    const isDuration = isDurationExercise(exerciseCategory, displayName);
 
-                  {/* Logged sets */}
-                  {sets.map((set) => (
-                    <div
-                      key={set.id}
-                      className={cn(
-                        "grid grid-cols-[2rem_1fr_1fr_1fr_2rem] gap-2 items-center rounded-lg px-1 py-1.5 text-sm",
-                        set.isPr && "bg-amber-500/10 border border-amber-500/20 rounded-xl"
-                      )}
-                    >
-                      <span className="text-muted-foreground text-xs">
-                        {set.setNumber}
-                      </span>
-                      <span className="font-medium">
-                        {set.weight ?? "—"}
-                      </span>
-                      <span className="font-medium">{set.reps ?? "—"}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {set.setType}
-                        {set.isPr && (
-                          <Trophy className="inline ml-1 h-3 w-3 text-amber-400" />
+                    return (
+                      <>
+                        {/* Set headers */}
+                        {sets.length > 0 && (
+                          <div className={cn(
+                            "gap-2 text-[10px] text-muted-foreground uppercase tracking-wider px-1 grid",
+                            isDuration
+                              ? "grid-cols-[2rem_1fr_1fr_2rem]"
+                              : "grid-cols-[2rem_1fr_1fr_1fr_2rem]"
+                          )}>
+                            <span>Set</span>
+                            {isDuration ? (
+                              <>
+                                <span>Duration</span>
+                                <span>Type</span>
+                              </>
+                            ) : (
+                              <>
+                                <span>Weight</span>
+                                <span>Reps</span>
+                                <span>Type</span>
+                              </>
+                            )}
+                            <span />
+                          </div>
                         )}
-                      </span>
-                      {!isCompleted && (
-                        <button
-                          onClick={() => handleDeleteSet(set.id)}
-                          className="text-muted-foreground hover:text-destructive transition-colors"
-                          disabled={pending}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
 
-                  {/* Add set row */}
-                  {!isCompleted && (
-                    <div className="grid grid-cols-[2rem_1fr_1fr_1fr_2rem] gap-2 items-center pt-1">
-                      <span className="text-muted-foreground text-xs">
-                        {sets.length + 1}
-                      </span>
-                      <Input
-                        type="number"
-                        inputMode="decimal"
-                        placeholder="kg"
-                        value={getNewSet(exerciseId).weight}
-                        onChange={(e) =>
-                          updateNewSet(exerciseId, "weight", e.target.value)
-                        }
-                        className="h-9 rounded-lg bg-white/5 border-white/10 text-sm"
-                      />
-                      <Input
-                        type="number"
-                        inputMode="numeric"
-                        placeholder="reps"
-                        value={getNewSet(exerciseId).reps}
-                        onChange={(e) =>
-                          updateNewSet(exerciseId, "reps", e.target.value)
-                        }
-                        className="h-9 rounded-lg bg-white/5 border-white/10 text-sm"
-                      />
-                      <Select
-                        value={getNewSet(exerciseId).setType}
-                        onValueChange={(v) => {
-                          if (!v) return;
-                          updateNewSet(exerciseId, "setType", v);
-                        }}
-                      >
-                        <SelectTrigger className="h-9 rounded-lg bg-white/5 border-white/10 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="warmup">Warmup</SelectItem>
-                          <SelectItem value="working">Working</SelectItem>
-                          <SelectItem value="dropset">Drop</SelectItem>
-                          <SelectItem value="failure">Failure</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <button
-                        onClick={() => handleAddSet(exerciseId)}
-                        disabled={pending}
-                        className="flex items-center justify-center h-9 w-9 rounded-lg bg-primary text-primary-foreground"
-                      >
-                        <Check className="h-4 w-4" />
-                      </button>
-                    </div>
-                  )}
+                        {/* Logged sets */}
+                        {sets.map((set) => (
+                          <div
+                            key={set.id}
+                            className={cn(
+                              "gap-2 items-center rounded-lg px-1 py-1.5 text-sm grid",
+                              isDuration
+                                ? "grid-cols-[2rem_1fr_1fr_2rem]"
+                                : "grid-cols-[2rem_1fr_1fr_1fr_2rem]",
+                              set.isPr && "bg-amber-500/10 border border-amber-500/20 rounded-xl"
+                            )}
+                          >
+                            <span className="text-muted-foreground text-xs">
+                              {set.setNumber}
+                            </span>
+                            {isDuration ? (
+                              <>
+                                <span className="font-medium">
+                                  {set.durationSeconds
+                                    ? formatDurationDisplay(set.durationSeconds)
+                                    : "—"}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  {set.setType}
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="font-medium">
+                                  {set.weight ?? "—"}
+                                </span>
+                                <span className="font-medium">{set.reps ?? "—"}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {set.setType}
+                                  {set.isPr && (
+                                    <Trophy className="inline ml-1 h-3 w-3 text-amber-400" />
+                                  )}
+                                </span>
+                              </>
+                            )}
+                            {!isCompleted && (
+                              <button
+                                onClick={() => handleDeleteSet(set.id)}
+                                className="text-muted-foreground hover:text-destructive transition-colors"
+                                disabled={pending}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+
+                        {/* Add set row */}
+                        {!isCompleted && (
+                          <div className={cn(
+                            "gap-2 items-center pt-1 grid",
+                            isDuration
+                              ? "grid-cols-[2rem_1fr_1fr_2rem]"
+                              : "grid-cols-[2rem_1fr_1fr_1fr_2rem]"
+                          )}>
+                            <span className="text-muted-foreground text-xs">
+                              {sets.length + 1}
+                            </span>
+                            {isDuration ? (
+                              <>
+                                <Input
+                                  type="number"
+                                  inputMode="decimal"
+                                  placeholder="min"
+                                  value={getNewSet(exerciseId).duration}
+                                  onChange={(e) =>
+                                    updateNewSet(exerciseId, "duration", e.target.value)
+                                  }
+                                  className="h-9 rounded-lg bg-white/5 border-white/10 text-sm"
+                                />
+                                <Select
+                                  value={getNewSet(exerciseId).setType}
+                                  onValueChange={(v) => {
+                                    if (!v) return;
+                                    updateNewSet(exerciseId, "setType", v);
+                                  }}
+                                >
+                                  <SelectTrigger className="h-9 rounded-lg bg-white/5 border-white/10 text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="working">Working</SelectItem>
+                                    <SelectItem value="warmup">Warmup</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </>
+                            ) : (
+                              <>
+                                <Input
+                                  type="number"
+                                  inputMode="decimal"
+                                  placeholder="kg"
+                                  value={getNewSet(exerciseId).weight}
+                                  onChange={(e) =>
+                                    updateNewSet(exerciseId, "weight", e.target.value)
+                                  }
+                                  className="h-9 rounded-lg bg-white/5 border-white/10 text-sm"
+                                />
+                                <Input
+                                  type="number"
+                                  inputMode="numeric"
+                                  placeholder="reps"
+                                  value={getNewSet(exerciseId).reps}
+                                  onChange={(e) =>
+                                    updateNewSet(exerciseId, "reps", e.target.value)
+                                  }
+                                  className="h-9 rounded-lg bg-white/5 border-white/10 text-sm"
+                                />
+                                <Select
+                                  value={getNewSet(exerciseId).setType}
+                                  onValueChange={(v) => {
+                                    if (!v) return;
+                                    updateNewSet(exerciseId, "setType", v);
+                                  }}
+                                >
+                                  <SelectTrigger className="h-9 rounded-lg bg-white/5 border-white/10 text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="warmup">Warmup</SelectItem>
+                                    <SelectItem value="working">Working</SelectItem>
+                                    <SelectItem value="dropset">Drop</SelectItem>
+                                    <SelectItem value="failure">Failure</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </>
+                            )}
+                            <button
+                              onClick={() => handleAddSet(exerciseId)}
+                              disabled={pending}
+                              className="flex items-center justify-center h-9 w-9 rounded-lg bg-primary text-primary-foreground"
+                            >
+                              <Check className="h-4 w-4" />
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </CardContent>
               </Card>
             </BlurFade>
@@ -391,9 +533,9 @@ export function ActiveWorkout({
         })}
       </div>
 
-      {/* Actions */}
+      {/* Add Exercise */}
       {!isCompleted && (
-        <div className="mt-6 space-y-3">
+        <div className="mt-6">
           <Button
             variant="outline"
             onClick={() => setPickerOpen(true)}
@@ -401,14 +543,6 @@ export function ActiveWorkout({
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Exercise
-          </Button>
-
-          <Button
-            onClick={handleComplete}
-            disabled={pending || (loggedExerciseIds.length === 0)}
-            className="w-full h-14 rounded-2xl bg-primary text-primary-foreground font-bold text-base hover:bg-primary/90"
-          >
-            {pending ? "Finishing..." : "Finish Workout"}
           </Button>
         </div>
       )}
