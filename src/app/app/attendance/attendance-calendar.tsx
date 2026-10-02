@@ -13,15 +13,16 @@ type Props = {
   month: number;
   attendedDays: string[];
   activeCheckIn: boolean;
+  /** YYYY-MM-DD in the user's time zone */
+  today: string;
 };
 
-export function AttendanceCalendar({ year, month, attendedDays, activeCheckIn }: Props) {
+export function AttendanceCalendar({ year, month, attendedDays, activeCheckIn, today }: Props) {
   const firstDay = new Date(year, month - 1, 1);
   const lastDay = new Date(year, month, 0);
   const daysInMonth = lastDay.getDate();
   // getDay() returns 0=Sun, we want 0=Mon
   const startOffset = (firstDay.getDay() + 6) % 7;
-  const today = new Date().toISOString().split("T")[0];
   const attendedSet = new Set(attendedDays);
 
   const cells: (number | null)[] = [];

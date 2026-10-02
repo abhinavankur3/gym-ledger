@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import {
@@ -32,6 +32,8 @@ type Props = {
   attendanceData: AttendanceEntry[];
   volumeData: VolumeEntry[];
   prExercises: PRExercise[];
+  /** YYYY-MM-DD in the user's time zone */
+  today: string;
 };
 
 export function ChartsClient({
@@ -39,32 +41,39 @@ export function ChartsClient({
   attendanceData = [],
   volumeData = [],
   prExercises = [],
+  today,
 }: Props) {
   const [expandedPr, setExpandedPr] = useState<number | null>(null);
 
-  // Attendance heatmap data
+  // Attendance heatmap: 52 Monday-first week columns ending with the current week.
+  // The first column is padded so every row lines up with the same weekday.
   const heatmapData = useMemo(() => {
     const dates = new Set(attendanceData.map((a) => a.date));
-    const weeks: { date: string; attended: boolean }[][] = [];
-    const today = new Date();
-    const start = new Date(today);
-    start.setDate(start.getDate() - 364);
+    const end = new Date(`${today}T00:00:00Z`);
+    const endWeekday = (end.getUTCDay() + 6) % 7;
+    const start = new Date(end);
+    start.setUTCDate(start.getUTCDate() - endWeekday - 51 * 7);
 
-    let currentWeek: { date: string; attended: boolean }[] = [];
+    const weeks: ({ date: string; attended: boolean } | null)[][] = [];
     const cursor = new Date(start);
-
-    while (cursor.getTime() <= today.getTime()) {
-      const dateStr = cursor.toISOString().split("T")[0];
-      currentWeek.push({ date: dateStr, attended: dates.has(dateStr) });
-      if (cursor.getDay() === 0 || cursor.getTime() === today.getTime()) {
-        weeks.push(currentWeek);
-        currentWeek = [];
+    while (cursor.getTime() <= end.getTime()) {
+      const week: ({ date: string; attended: boolean } | null)[] = [];
+      for (let d = 0; d < 7; d++) {
+        const dateStr = cursor.toISOString().split("T")[0];
+        week.push(cursor.getTime() <= end.getTime() ? { date: dateStr, attended: dates.has(dateStr) } : null);
+        cursor.setUTCDate(cursor.getUTCDate() + 1);
       }
-      cursor.setDate(cursor.getDate() + 1);
+      weeks.push(week);
     }
-    if (currentWeek.length > 0) weeks.push(currentWeek);
     return weeks;
-  }, [attendanceData]);
+  }, [attendanceData, today]);
+
+  // Show the most recent weeks first on narrow screens.
+  const heatmapRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = heatmapRef.current;
+    if (el) el.scrollLeft = el.scrollWidth;
+  }, [heatmapData]);
 
   return (
     <div className="mt-4 space-y-4">
@@ -182,19 +191,23 @@ export function ChartsClient({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-0.5 overflow-x-auto no-scrollbar">
+          <div ref={heatmapRef} className="flex gap-0.5 overflow-x-auto no-scrollbar">
             {heatmapData.map((week, wi) => (
               <div key={wi} className="flex flex-col gap-0.5">
-                {week.map((day) => (
-                  <div
-                    key={day.date}
-                    title={day.date}
-                    className={cn(
-                      "h-3 w-3 rounded-sm transition-colors",
-                      day.attended ? "bg-emerald-500" : "bg-white/5"
-                    )}
-                  />
-                ))}
+                {week.map((day, di) =>
+                  day ? (
+                    <div
+                      key={day.date}
+                      title={day.date}
+                      className={cn(
+                        "h-3 w-3 shrink-0 rounded-sm transition-colors",
+                        day.attended ? "bg-emerald-500" : "bg-white/5"
+                      )}
+                    />
+                  ) : (
+                    <div key={`pad-${di}`} className="h-3 w-3 shrink-0" />
+                  )
+                )}
               </div>
             ))}
           </div>

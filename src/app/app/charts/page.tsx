@@ -1,4 +1,4 @@
-import { eq, desc, and, gte } from "drizzle-orm";
+import { eq, and, gte } from "drizzle-orm";
 import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/dal";
 import {
@@ -10,9 +10,13 @@ import {
 } from "@/lib/db/schema";
 import { BlurFade } from "@/components/ui/blur-fade";
 import { ChartsClient } from "./charts-client";
+import Link from "next/link";
+import { Plus } from "lucide-react";
+import { getUserTimeZone, localDateKey } from "@/lib/dates";
 
 export default async function ChartsPage() {
   const user = await getCurrentUser();
+  const tz = await getUserTimeZone();
 
   // Weight data (last 6 months)
   const sixMonthsAgo = new Date();
@@ -128,13 +132,17 @@ export default async function ChartsPage() {
   return (
     <div className="px-4 pt-8">
       <BlurFade delay={0}>
-        <h1 className="text-2xl font-bold tracking-tight">Charts</h1>
+        <div className="flex items-end justify-between gap-4">
+          <div><p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Your trends</p><h1 className="mt-1 text-3xl font-bold tracking-tight">Progress</h1></div>
+          <Link href="/app/metrics" className="inline-flex h-10 items-center gap-1.5 rounded-2xl border border-border bg-card px-3 text-sm font-semibold text-primary hover:border-primary/40"><Plus className="h-4 w-4" /> Log weight</Link>
+        </div>
       </BlurFade>
 
       <BlurFade delay={0.1}>
         <ChartsClient
           weightData={weightData.map((w) => ({ date: w.date, value: w.value, unit: w.unit }))}
-          attendanceData={attendanceData.filter((a) => a.checkIn).map((a) => ({ date: a.checkIn.split("T")[0] }))}
+          attendanceData={attendanceData.filter((a) => a.checkIn).map((a) => ({ date: localDateKey(a.checkIn, tz) }))}
+          today={localDateKey(new Date(), tz)}
           volumeData={volumeData}
           prExercises={prExercises}
         />

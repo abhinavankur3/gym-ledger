@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { eq, and, gte, sql, desc } from "drizzle-orm";
 import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/dal";
@@ -5,68 +6,48 @@ import { gymAttendance } from "@/lib/db/schema";
 import { BlurFade } from "@/components/ui/blur-fade";
 import { AttendanceCalendar } from "./attendance-calendar";
 import { CheckInButton } from "./check-in-button";
-import { Flame } from "lucide-react";
+import { ArrowLeft, Flame } from "lucide-react";
+import { getUserTimeZone, localDateKey, startOfLocalDayIso } from "@/lib/dates";
 
 export default async function AttendancePage() {
   const user = await getCurrentUser();
+  const tz = await getUserTimeZone();
   const now = new Date();
-  const today = now.toISOString().split("T")[0];
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
+  const today = localDateKey(now, tz);
+  const [year, month] = today.split("-").map(Number);
 
-  // Active check-in
+  // Active check-in (since local midnight)
   const activeCheckIn = await db.query.gymAttendance.findFirst({
     where: and(
       eq(gymAttendance.userId, user.id),
-      gte(gymAttendance.checkIn, today),
+      gte(gymAttendance.checkIn, startOfLocalDayIso(now, tz)),
       sql`${gymAttendance.checkOut} IS NULL`
     ),
   });
 
-  // This month's attendance
-  const start = `${year}-${String(month).padStart(2, "0")}-01`;
-  const endMonth = month === 12 ? 1 : month + 1;
-  const endYear = month === 12 ? year + 1 : year;
-  const end = `${endYear}-${String(endMonth).padStart(2, "0")}-01`;
-
-  const monthRecords = await db.query.gymAttendance.findMany({
-    where: and(
-      eq(gymAttendance.userId, user.id),
-      gte(gymAttendance.checkIn, start),
-      sql`${gymAttendance.checkIn} < ${end}`
-    ),
-    orderBy: [desc(gymAttendance.checkIn)],
-  });
-
-  // Calculate streak
   const allRecords = await db.query.gymAttendance.findMany({
     where: eq(gymAttendance.userId, user.id),
     orderBy: [desc(gymAttendance.checkIn)],
     limit: 365,
   });
+  const attendedDates = new Set(allRecords.map((r) => localDateKey(r.checkIn, tz)));
 
+  // Streak: consecutive local days ending today (or yesterday if not yet checked in today)
   let streak = 0;
-  if (allRecords.length > 0) {
-    const attendedDates = new Set(
-      allRecords.map((r) => r.checkIn.split("T")[0])
-    );
-    const checkDate = new Date(today);
-    if (!attendedDates.has(today)) {
-      checkDate.setDate(checkDate.getDate() - 1);
-    }
-    while (attendedDates.has(checkDate.toISOString().split("T")[0])) {
-      streak++;
-      checkDate.setDate(checkDate.getDate() - 1);
-    }
+  const cursor = new Date(`${today}T00:00:00Z`);
+  if (!attendedDates.has(today)) cursor.setUTCDate(cursor.getUTCDate() - 1);
+  while (attendedDates.has(cursor.toISOString().split("T")[0])) {
+    streak++;
+    cursor.setUTCDate(cursor.getUTCDate() - 1);
   }
 
-  const attendedDays = new Set(
-    monthRecords.map((r) => r.checkIn.split("T")[0])
-  );
+  const monthPrefix = today.slice(0, 8);
+  const attendedDays = new Set([...attendedDates].filter((d) => d.startsWith(monthPrefix)));
 
   return (
     <div className="px-4 pt-8">
       <BlurFade delay={0}>
+        <Link href="/app/more" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> More</Link>
         <h1 className="text-2xl font-bold tracking-tight">Attendance</h1>
       </BlurFade>
 
@@ -93,6 +74,7 @@ export default async function AttendancePage() {
             month={month}
             attendedDays={Array.from(attendedDays)}
             activeCheckIn={!!activeCheckIn}
+            today={today}
           />
         </div>
       </BlurFade>

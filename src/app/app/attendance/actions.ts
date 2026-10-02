@@ -5,11 +5,12 @@ import { revalidatePath } from "next/cache";
 import db from "@/lib/db";
 import { gymAttendance } from "@/lib/db/schema";
 import { verifySession } from "@/lib/auth/dal";
+import { getUserTimeZone, startOfLocalDayIso } from "@/lib/dates";
 
 export async function checkIn() {
   const session = await verifySession();
   const now = new Date().toISOString();
-  const today = now.split("T")[0];
+  const today = startOfLocalDayIso(new Date(), await getUserTimeZone());
 
   // Check if already checked in today
   const existing = await db.query.gymAttendance.findFirst({
@@ -36,7 +37,7 @@ export async function checkIn() {
 
 export async function checkOut() {
   const session = await verifySession();
-  const today = new Date().toISOString().split("T")[0];
+  const today = startOfLocalDayIso(new Date(), await getUserTimeZone());
 
   const active = await db.query.gymAttendance.findFirst({
     where: and(
