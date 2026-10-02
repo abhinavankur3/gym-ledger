@@ -1,4 +1,5 @@
-const CACHE_NAME = "gym-ledger-v1";
+// Bump to purge caches written by older workers.
+const CACHE_NAME = "gym-ledger-v2";
 const STATIC_ASSETS = ["/icon-192x192.png", "/icon-512x512.png"];
 
 self.addEventListener("install", (event) => {
@@ -25,8 +26,13 @@ self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;
 
-  // Cache-first for static assets
-  if (request.url.match(/\.(js|css|png|jpg|svg|woff2?)$/)) {
+  // Cache-first only for immutable assets: content-hashed build output and app icons.
+  // Anything else could change under the same URL and must not be served stale.
+  const url = new URL(request.url);
+  const immutable =
+    url.origin === self.location.origin &&
+    (url.pathname.startsWith("/_next/static/") || STATIC_ASSETS.includes(url.pathname));
+  if (immutable) {
     event.respondWith(
       caches
         .match(request)
@@ -34,8 +40,10 @@ self.addEventListener("fetch", (event) => {
           (cached) =>
             cached ||
             fetch(request).then((res) => {
-              const clone = res.clone();
-              caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+              if (res.ok) {
+                const clone = res.clone();
+                caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+              }
               return res;
             })
         )
