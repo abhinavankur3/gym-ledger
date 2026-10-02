@@ -6,7 +6,6 @@ import db from "@/lib/db";
 import {
   workoutTemplates,
   workoutTemplateExercises,
-  exercises,
 } from "@/lib/db/schema";
 import { verifySession } from "@/lib/auth/dal";
 

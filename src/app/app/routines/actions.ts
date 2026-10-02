@@ -6,10 +6,10 @@ import db from "@/lib/db";
 import {
   routines,
   routineDays,
-  workoutTemplates,
   workoutTemplateExercises,
 } from "@/lib/db/schema";
 import { verifySession } from "@/lib/auth/dal";
+import { getUserTimeZone, localWeekday } from "@/lib/dates";
 
 export async function getRoutines() {
   const session = await verifySession();
@@ -99,9 +99,8 @@ export async function getTodayTemplate() {
 
   if (!activeRoutine) return null;
 
-  // Convert JS day (0=Sun) to our format (0=Mon...6=Sun)
-  const jsDow = new Date().getDay();
-  const dayOfWeek = (jsDow + 6) % 7;
+  // 0=Mon...6=Sun, in the user's own time zone
+  const dayOfWeek = localWeekday(new Date(), await getUserTimeZone());
 
   const todayDay = activeRoutine.days.find((d) => d.dayOfWeek === dayOfWeek);
   if (!todayDay) return null;
@@ -242,4 +241,23 @@ export async function removeTemplateFromDay(
   revalidatePath("/app/routines");
   revalidatePath("/app");
   return { success: true };
+}
+
+/** The next scheduled training day after today in the active routine, for rest-day messaging. */
+export async function getNextTrainingDay() {
+  const session = await verifySession();
+
+  const activeRoutine = await db.query.routines.findFirst({
+    where: and(eq(routines.userId, session.userId), eq(routines.isActive, true)),
+    with: { days: { with: { template: { columns: { name: true } } } } },
+  });
+  if (!activeRoutine || activeRoutine.days.length === 0) return null;
+
+  const today = localWeekday(new Date(), await getUserTimeZone());
+  for (let offset = 1; offset <= 7; offset++) {
+    const dayOfWeek = (today + offset) % 7;
+    const day = activeRoutine.days.find((d) => d.dayOfWeek === dayOfWeek);
+    if (day) return { name: day.template.name, dayOfWeek, inDays: offset };
+  }
+  return null;
 }
