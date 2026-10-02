@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { FactTable } from "@/components/fact-table";
 import { GeneratingOverlay } from "@/components/generating-overlay";
 import { cn } from "@/lib/utils";
-import { SLOT_LABEL, dayTotal, itemsTotal, type MealDay, type MealPlan } from "@/lib/nutrition/meal-plan";
+import { SLOT_LABEL, dayTotal, isProteinPowder, itemsTotal, type MealDay, type MealPlan } from "@/lib/nutrition/meal-plan";
 import { INDIAN_REGIONS } from "@/lib/nutrition/region";
 import type { NutritionTargets } from "@/lib/nutrition/targets";
 import { buildMealPlan, confirmMealPlan, discardMealPlanDraft, setCuisineRegion } from "./actions";
@@ -28,7 +28,7 @@ export function DayMeals({ day, targets }: { day: MealDay; targets: Pick<Nutriti
   const total = dayTotal(day);
   const kcalPct = Math.min(100, (total.kcal / targets.kcal) * 100);
   // When the whole day was scaled by one factor, say it once instead of on every item
-  const servings = new Set(day.meals.flatMap((m) => m.items.map((i) => i.servings)));
+  const servings = new Set(day.meals.flatMap((m) => m.items.filter((i) => !isProteinPowder(i.name)).map((i) => i.servings)));
   const uniform = servings.size === 1 ? [...servings][0] : null;
   return (
     <div className="space-y-4">
@@ -40,6 +40,9 @@ export function DayMeals({ day, targets }: { day: MealDay; targets: Pick<Nutriti
         <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted" aria-hidden>
           <div className="h-full rounded-full bg-legs" style={{ width: `${kcalPct}%` }} />
         </div>
+        {total.kcal < targets.kcal - 50 && (
+          <p className="mt-2 text-xs text-muted-foreground">{Math.round((targets.kcal - total.kcal) / 10) * 10} kcal left open for extras.</p>
+        )}
         {uniform !== null && uniform !== 1 && (
           <p className="mt-3 text-sm text-muted-foreground">Have {servingsLabel(uniform).replace("× ", "")}× each portion listed to reach your target.</p>
         )}
@@ -60,7 +63,7 @@ export function DayMeals({ day, targets }: { day: MealDay; targets: Pick<Nutriti
                 label: (
                   <span className="block min-w-0">
                     <span className="block truncate">{item.name}</span>
-                    <span className="block truncate text-xs text-muted-foreground">{item.portion} {uniform === null ? servingsLabel(item.servings) : ""}</span>
+                    <span className="block truncate text-xs text-muted-foreground">{item.portion} {uniform === null || isProteinPowder(item.name) ? servingsLabel(item.servings) : ""}</span>
                   </span>
                 ),
                 value: `${Math.round(item.kcal * item.servings)} kcal`,

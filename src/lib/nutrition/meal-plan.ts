@@ -149,10 +149,56 @@ export function scaleDay(day: MealDay, targetKcal: number): MealDay {
   };
 }
 
+// ---------------------------------------------------------------- protein shake
+
+/** Meals are planned to this share of daily calories and protein; a protein shake covers the protein gap. */
+export const MEAL_SHARE = 0.8;
+const MAX_SCOOPS = 2;
+const MIN_GAP_GRAMS = 8;
+
+export const PROTEIN_POWDERS = {
+  whey: { name: "Whey protein shake", portion: "1 scoop (30 g) in water", kcal: 120, protein: 24, carbs: 3, fat: 1.5 },
+  plant: { name: "Plant protein shake (pea)", portion: "1 scoop (33 g) in water", kcal: 125, protein: 22, carbs: 3, fat: 2 },
+} as const;
+
+export function isProteinPowder(name: string) {
+  return /\bwhey\b|protein (shake|powder|smoothie)|protein scoop/i.test(name);
+}
+
+/** Which powder fits the diet, or null when the user wants none. */
+export function choosePowder(rules: DietRules): keyof typeof PROTEIN_POWDERS | null {
+  const note = (rules.avoidFoods ?? "").toLowerCase();
+  if (/\b(whey|protein powders?|protein shakes?|supplements?)\b/.test(note)) return null;
+  if (rules.preference === "vegan" || /\b(dairy|lactose|milk)\b/.test(note)) return "plant";
+  return "whey";
+}
+
+/** Adds a protein shake sized to the day's protein gap (half-scoop steps, up to 2 scoops) to the snack. */
+export function addProteinShake(day: MealDay, proteinTarget: number, rules: DietRules): MealDay {
+  const kind = choosePowder(rules);
+  if (!kind) return day;
+  const gap = proteinTarget - dayTotal(day).protein;
+  if (gap < MIN_GAP_GRAMS) return day;
+  const powder = PROTEIN_POWDERS[kind];
+  const scoops = Math.min(MAX_SCOOPS, Math.max(0.5, Math.round((gap / powder.protein) * 2) / 2));
+  const shake: MealItem = { ...powder, servings: scoops };
+  const meals = day.meals.map((m) => ({ ...m, items: [...m.items] }));
+  const snack = meals.find((m) => m.slot === "snack");
+  if (snack) snack.items.push(shake);
+  else meals.push({ slot: "snack", title: "Protein shake", items: [shake] });
+  meals.sort((a, b) => MEAL_SLOTS.indexOf(a.slot) - MEAL_SLOTS.indexOf(b.slot));
+  return { meals };
+}
+
+/** Meals scaled to 80% of calories, then the protein shake on top. */
+export function finishDay(day: MealDay, targets: Pick<NutritionTargets, "kcal" | "protein">, rules: DietRules): MealDay {
+  return addProteinShake(scaleDay(day, targets.kcal * MEAL_SHARE), targets.protein, rules);
+}
+
 // ---------------------------------------------------------------- resolve
 
 /** Validates a model plan; returns null when it's unusable so the caller falls back. */
-export function resolveMealPlan(raw: RawMealPlan, targets: Pick<NutritionTargets, "kcal">, rules: DietRules): MealPlan | null {
+export function resolveMealPlan(raw: RawMealPlan, targets: Pick<NutritionTargets, "kcal" | "protein">, rules: DietRules): MealPlan | null {
   const avoidWords = avoidFoodWords(rules.avoidFoods);
   const days: MealDay[] = [];
 
@@ -165,7 +211,8 @@ export function resolveMealPlan(raw: RawMealPlan, targets: Pick<NutritionTargets
       if (title && violatesDiet(title, rules, avoidWords)) continue;
       const items = (rawMeal.items ?? [])
         .map(cleanItem)
-        .filter((i): i is MealItem => !!i && !violatesDiet(i.name, rules, avoidWords));
+        // Protein powder is added by code, sized to the gap; drop any the model included
+        .filter((i): i is MealItem => !!i && !isProteinPowder(i.name) && !violatesDiet(i.name, rules, avoidWords));
       if (items.length) meals.push({ slot, title: title || items.map((i) => i.name).join(", "), items });
     }
     meals.sort((a, b) => MEAL_SLOTS.indexOf(a.slot) - MEAL_SLOTS.indexOf(b.slot));
@@ -176,7 +223,7 @@ export function resolveMealPlan(raw: RawMealPlan, targets: Pick<NutritionTargets
   if (days.length < 3) return null;
   // Short weeks repeat the valid days in order to make seven
   const week = Array.from({ length: 7 }, (_, i) => days[i % days.length]);
-  return { name: cleanLabel(String(raw.name ?? ""), 60) || "Your meal plan", days: week.map((d) => scaleDay(d, targets.kcal)) };
+  return { name: cleanLabel(String(raw.name ?? ""), 60) || "Your meal plan", days: week.map((d) => finishDay(d, targets, rules)) };
 }
 
 // ---------------------------------------------------------------- fallback
@@ -194,10 +241,10 @@ function dishAllowed(dish: Dish, rules: DietRules, avoidWords: string[]) {
 const dishToItem = (d: Dish): MealItem => ({ name: d.name, portion: d.serving, servings: 1, kcal: d.kcal, protein: d.protein, carbs: d.carbs, fat: d.fat });
 
 /** Offline plan from the fallback dish set, rotated for variety and scaled to target. */
-export function fallbackMealPlan(targets: Pick<NutritionTargets, "kcal">, rules: DietRules, opts: { countryCode?: string | null; indianRegion?: string | null } = {}): MealPlan {
+export function fallbackMealPlan(targets: Pick<NutritionTargets, "kcal" | "protein">, rules: DietRules, opts: { countryCode?: string | null; indianRegion?: string | null } = {}): MealPlan {
   const avoidWords = avoidFoodWords(rules.avoidFoods);
   const region = opts.countryCode === "IN" ? "IN" : "global";
-  const pool = DISHES.filter((d) => d.region === region && dishAllowed(d, rules, avoidWords))
+  const pool = DISHES.filter((d) => d.region === region && !isProteinPowder(d.name) && dishAllowed(d, rules, avoidWords))
     // Prefer the chosen sub-region, then pan-Indian staples
     .sort((a, b) => Number(!!b.subRegions?.includes(opts.indianRegion as never)) - Number(!!a.subRegions?.includes(opts.indianRegion as never)));
   const bySlot = (slot: MealSlot) => pool.filter((d) => d.meals.includes(slot));
@@ -227,7 +274,7 @@ export function fallbackMealPlan(targets: Pick<NutritionTargets, "kcal">, rules:
     const dinner = [...pick(proteinMains.slice(0, Math.max(3, Math.ceil(proteinMains.length / 3))), 1, day + 2), ...pick(mains, 2, day * 2 + 5)];
     const dinnerUnique = dinner.filter((d, i) => dinner.indexOf(d) === i).slice(0, 3);
     if (dinnerUnique.length) meals.push({ slot: "dinner", title: dinnerUnique.map((d) => d.name).join(", "), items: dinnerUnique.map(dishToItem) });
-    return scaleDay({ meals }, targets.kcal);
+    return finishDay({ meals }, targets, rules);
   });
 
   return { name: region === "IN" ? "Everyday Indian plan" : "Everyday plan", days };

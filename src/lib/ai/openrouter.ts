@@ -1,8 +1,5 @@
 import "server-only";
 
-/** Default OpenRouter model for structured generation and image understanding. */
-export const DEFAULT_MODEL = "qwen/qwen3.7-flash";
-
 type JsonCall = {
   /** Short schema name for the provider */
   name: string;
@@ -19,53 +16,129 @@ type JsonCall = {
  * One structured-output call. Returns the parsed JSON, or null on any failure
  * (no key, HTTP error, timeout, empty or invalid output) so callers fall back.
  */
-export async function openRouterJson({ name, system, user, schema, maxTokens, timeoutMs, temperature = 0.4 }: JsonCall): Promise<unknown | null> {
+export async function openRouterJson({
+  name,
+  system,
+  user,
+  schema,
+  maxTokens,
+  timeoutMs,
+  temperature = 0.4,
+}: JsonCall): Promise<unknown | null> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     console.warn(`[openrouter] ${name}: no OPENROUTER_API_KEY, using fallback`);
     return null;
   }
-  const model = process.env.OPENROUTER_GENERATION_MODEL ?? DEFAULT_MODEL;
+  const model = process.env.OPENROUTER_GENERATION_MODEL;
   const started = Date.now();
   try {
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": process.env.APP_URL ?? "http://localhost:3000",
-        "X-Title": "Kochi",
+    const response = await fetch(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": process.env.APP_URL ?? "http://localhost:3000",
+          "X-Title": "Kochi",
+        },
+        body: JSON.stringify({
+          model,
+          temperature,
+          max_tokens: maxTokens,
+          // Structured output only; thinking tokens would eat the budget and the timeout.
+          reasoning: { enabled: false },
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: JSON.stringify(user) },
+          ],
+          response_format: {
+            type: "json_schema",
+            json_schema: { name, strict: true, schema },
+          },
+        }),
+        signal: AbortSignal.timeout(timeoutMs),
       },
+    );
+    if (!response.ok) {
+      console.warn(
+        `[openrouter] ${name}: ${model} returned HTTP ${response.status} after ${Date.now() - started} ms: ${(await response.text()).slice(0, 300)}`,
+      );
+      return null;
+    }
+    const payload = (await response.json()) as {
+      choices?: Array<{
+        message?: { content?: string };
+        finish_reason?: string;
+      }>;
+      usage?: { completion_tokens?: number };
+    };
+    const choice = payload.choices?.[0];
+    const content = choice?.message?.content;
+    if (!content) {
+      console.warn(
+        `[openrouter] ${name}: ${model} returned no content (finish_reason ${choice?.finish_reason ?? "unknown"}) after ${Date.now() - started} ms`,
+      );
+      return null;
+    }
+    console.info(
+      `[openrouter] ${name}: ${model} ok in ${Date.now() - started} ms, ${payload.usage?.completion_tokens ?? "?"} output tokens, finish ${choice?.finish_reason}`,
+    );
+    return JSON.parse(content);
+  } catch (error) {
+    // Never log request content or keys; only what went wrong
+    console.warn(
+      `[openrouter] ${name}: ${model} failed after ${Date.now() - started} ms: ${error instanceof Error ? error.name + " " + error.message.slice(0, 200) : "unknown error"}`,
+    );
+    return null;
+  }
+}
+
+/** Default Jev model for scoring candidate plans. */
+export const DEFAULT_DECISION_MODEL = "typesafe/jev-1.13";
+
+type ScoreQuestion = { instructions: string; criteria: string[] };
+
+/**
+ * Asks Jev (OpenRouter Decisions API) to score `state` on each question. Returns
+ * the probability-weighted score per question (0 = first criterion), or null on
+ * any failure so callers keep their default choice. Logs outcome, never content.
+ */
+export async function jevScore(name: string, state: unknown, questions: Record<string, ScoreQuestion>, timeoutMs = 10_000): Promise<Record<string, number> | null> {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) return null;
+  const model = process.env.OPENROUTER_DECISION_MODEL ?? DEFAULT_DECISION_MODEL;
+  const started = Date.now();
+  try {
+    const response = await fetch("https://openrouter.ai/api/alpha/decisions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", "X-Title": "Kochi" },
       body: JSON.stringify({
         model,
-        temperature,
-        max_tokens: maxTokens,
-        // Structured output only; thinking tokens would eat the budget and the timeout.
-        reasoning: { enabled: false },
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: JSON.stringify(user) },
-        ],
-        response_format: { type: "json_schema", json_schema: { name, strict: true, schema } },
+        state,
+        questions: Object.fromEntries(Object.entries(questions).map(([key, q]) => [key, { type: "score", ...q }])),
       }),
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (!response.ok) {
-      console.warn(`[openrouter] ${name}: ${model} returned HTTP ${response.status} after ${Date.now() - started} ms: ${(await response.text()).slice(0, 300)}`);
+      console.warn(`[jev] ${name}: ${model} returned HTTP ${response.status} after ${Date.now() - started} ms: ${(await response.text()).slice(0, 300)}`);
       return null;
     }
-    const payload = (await response.json()) as { choices?: Array<{ message?: { content?: string }; finish_reason?: string }>; usage?: { completion_tokens?: number } };
-    const choice = payload.choices?.[0];
-    const content = choice?.message?.content;
-    if (!content) {
-      console.warn(`[openrouter] ${name}: ${model} returned no content (finish_reason ${choice?.finish_reason ?? "unknown"}) after ${Date.now() - started} ms`);
-      return null;
+    const payload = (await response.json()) as { answers?: Record<string, { type?: string; score?: number; confidence?: number }> };
+    const scores: Record<string, number> = {};
+    for (const key of Object.keys(questions)) {
+      const answer = payload.answers?.[key];
+      if (typeof answer?.score !== "number") {
+        console.warn(`[jev] ${name}: answer "${key}" missing a score (got keys: ${Object.keys(payload.answers ?? {}).join(", ") || "none"})`);
+        return null;
+      }
+      scores[key] = answer.score;
     }
-    console.info(`[openrouter] ${name}: ${model} ok in ${Date.now() - started} ms, ${payload.usage?.completion_tokens ?? "?"} output tokens, finish ${choice?.finish_reason}`);
-    return JSON.parse(content);
+    console.info(`[jev] ${name}: ${model} ok in ${Date.now() - started} ms, scores ${Object.entries(scores).map(([k, v]) => `${k}=${v.toFixed(2)}`).join(" ")}`);
+    return scores;
   } catch (error) {
-    // Never log request content or keys; only what went wrong
-    console.warn(`[openrouter] ${name}: ${model} failed after ${Date.now() - started} ms: ${error instanceof Error ? error.name + " " + error.message.slice(0, 200) : "unknown error"}`);
+    console.warn(`[jev] ${name}: ${model} failed after ${Date.now() - started} ms: ${error instanceof Error ? error.name + " " + error.message.slice(0, 200) : "unknown error"}`);
     return null;
   }
 }

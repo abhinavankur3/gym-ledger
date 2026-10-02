@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DISHES } from "./dish-catalog";
-import { avoidFoodWords, cleanItem, dayTotal, fallbackMealPlan, resolveMealPlan, scaleDay, violatesDiet, type RawMealPlan } from "./meal-plan";
+import { MEAL_SHARE, PROTEIN_POWDERS, addProteinShake, avoidFoodWords, choosePowder, cleanItem, dayTotal, fallbackMealPlan, resolveMealPlan, scaleDay, violatesDiet, type RawMealPlan } from "./meal-plan";
 
 const item = (name: string, kcal = 300, protein = 15, carbs = 40, fat = 8) => ({ name, portion: "1 bowl", kcal, protein, carbs, fat });
 const rawDay = (lunch: string, dinner = "Dal tadka") => ({
@@ -11,7 +11,7 @@ const rawDay = (lunch: string, dinner = "Dal tadka") => ({
   ],
 });
 const plan = (days: RawMealPlan["days"]): RawMealPlan => ({ name: "Test plan", days });
-const target = { kcal: 2000 };
+const target = { kcal: 2000, protein: 120 };
 
 describe("violatesDiet", () => {
   it("blocks meat and fish for vegetarians, not eggplant or paneer", () => {
@@ -106,14 +106,15 @@ describe("resolveMealPlan", () => {
 
   it("ignores unknown meal slots", () => {
     const day = { meals: [...rawDay("Chole").meals, { slot: "midnight", title: "Cake", items: [item("Cake")] }] };
-    const resolved = resolveMealPlan(plan([day, rawDay("Rajma"), rawDay("Dal")]), target, { preference: "none" })!;
+    const resolved = resolveMealPlan(plan([day, rawDay("Rajma"), rawDay("Dal")]), { kcal: 2000, protein: 0 }, { preference: "none" })!;
     expect(resolved.days[0].meals.map((m) => m.slot)).toEqual(["breakfast", "lunch", "dinner"]);
   });
 
   it("scales each day toward the calorie target", () => {
-    const resolved = resolveMealPlan(plan([rawDay("Chole"), rawDay("Rajma"), rawDay("Dal")]), { kcal: 2400 }, { preference: "none" })!;
+    const resolved = resolveMealPlan(plan([rawDay("Chole"), rawDay("Rajma"), rawDay("Dal")]), { kcal: 2400, protein: 0 }, { preference: "none" })!;
+    // Meals are planned to 80% of the day; protein 0 means no shake is added
     const kcal = dayTotal(resolved.days[0]).kcal;
-    expect(Math.abs(kcal - 2400) / 2400).toBeLessThan(0.25);
+    expect(Math.abs(kcal - 2400 * MEAL_SHARE) / (2400 * MEAL_SHARE)).toBeLessThan(0.25);
   });
 });
 
@@ -123,7 +124,7 @@ describe("fallbackMealPlan", () => {
   it("builds a full week for every diet in both regions", () => {
     for (const preference of prefs) {
       for (const countryCode of ["IN", "US"]) {
-        const p = fallbackMealPlan({ kcal: 2200 }, { preference }, { countryCode });
+        const p = fallbackMealPlan({ kcal: 2200, protein: 130 }, { preference }, { countryCode });
         expect(p.days).toHaveLength(7);
         expect(p.days.every((d) => d.meals.some((m) => m.slot === "lunch") && d.meals.some((m) => m.slot === "dinner"))).toBe(true);
       }
@@ -133,9 +134,9 @@ describe("fallbackMealPlan", () => {
   it("only uses dishes that fit the diet and avoid-list", () => {
     for (const preference of prefs) {
       const rules = { preference, avoidFoods: "peanuts" };
-      const names = fallbackMealPlan({ kcal: 2000 }, rules, { countryCode: "IN" }).days.flatMap((d) => d.meals.flatMap((m) => m.items.map((i) => i.name)));
+      const names = fallbackMealPlan({ kcal: 2000, protein: 120 }, rules, { countryCode: "IN" }).days.flatMap((d) => d.meals.flatMap((m) => m.items.map((i) => i.name)));
       expect(names.every((n) => !violatesDiet(n, rules))).toBe(true);
-      const dishes = names.map((n) => DISHES.find((d) => d.name === n)!);
+      const dishes = names.filter((n) => !Object.values(PROTEIN_POWDERS).some((p) => p.name === n)).map((n) => DISHES.find((d) => d.name === n)!);
       expect(dishes.every((d) => !d.contains.includes("peanut"))).toBe(true);
     }
   });
@@ -151,5 +152,42 @@ describe("dish catalog", () => {
 
   it("has unique ids", () => {
     expect(new Set(DISHES.map((d) => d.id)).size).toBe(DISHES.length);
+  });
+});
+
+describe("protein shake", () => {
+  const day = { meals: [{ slot: "lunch" as const, title: "Dal rice", items: [{ ...item("Dal rice", 600, 30, 90, 12), servings: 1 }] }] };
+
+  it("fills the protein gap in half-scoop steps, capped at two scoops", () => {
+    const withShake = addProteinShake(day, 60, { preference: "none" });
+    const shake = withShake.meals.find((m) => m.slot === "snack")!.items[0];
+    expect(shake.name).toBe("Whey protein shake");
+    expect(shake.servings).toBe(1.5); // 30 g gap / 24 g per scoop = 1.25 → nearest half, rounding up
+    expect(addProteinShake(day, 200, { preference: "none" }).meals.find((m) => m.slot === "snack")!.items[0].servings).toBe(2);
+  });
+
+  it("skips the shake when meals already cover protein", () => {
+    expect(addProteinShake(day, 35, { preference: "none" })).toBe(day);
+  });
+
+  it("uses plant protein for vegans and dairy-free, and none when asked", () => {
+    expect(choosePowder({ preference: "vegan" })).toBe("plant");
+    expect(choosePowder({ preference: "none", avoidFoods: "lactose intolerant" })).toBe("plant");
+    expect(choosePowder({ preference: "none", avoidFoods: "no protein powder please" })).toBeNull();
+    expect(choosePowder({ preference: "jain" })).toBe("whey");
+  });
+
+  it("drops protein powder the model put in meals and adds Kochi's own", () => {
+    const raw = plan([rawDay("Chole"), rawDay("Rajma"), rawDay("Dal")]);
+    raw.days[0].meals[0].items.push(item("Whey protein shake", 120, 24, 3, 1.5));
+    const resolved = resolveMealPlan(raw, { kcal: 2000, protein: 160 }, { preference: "none" })!;
+    const shakes = resolved.days[0].meals.flatMap((m) => m.items).filter((i) => /protein shake/i.test(i.name));
+    expect(shakes).toHaveLength(1);
+    expect(resolved.days[0].meals.find((m) => m.slot === "snack")).toBeDefined();
+  });
+
+  it("fallback plans get the shake too", () => {
+    const p = fallbackMealPlan({ kcal: 2400, protein: 170 }, { preference: "vegetarian" }, { countryCode: "IN" });
+    expect(p.days.every((d) => d.meals.some((m) => m.items.some((i) => i.name === "Whey protein shake")))).toBe(true);
   });
 });
