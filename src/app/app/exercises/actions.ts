@@ -1,6 +1,6 @@
 "use server";
 
-import { like, or } from "drizzle-orm";
+import { like } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import db from "@/lib/db";
 import { exercises } from "@/lib/db/schema";
@@ -8,8 +8,6 @@ import { verifySession } from "@/lib/auth/dal";
 
 export async function getExercises(search?: string, category?: string, muscleGroup?: string) {
   await verifySession();
-
-  let query = db.select().from(exercises).$dynamic();
 
   // Build conditions - for simplicity we'll filter in JS for complex cases
   const allExercises = await db.query.exercises.findMany({

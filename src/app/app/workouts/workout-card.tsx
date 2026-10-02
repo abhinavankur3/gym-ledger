@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deleteWorkout } from "./actions";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { Dumbbell, Clock, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 const MUSCLE_GROUP_COLORS: Record<string, string> = {
   chest: "bg-rose-500/20 text-rose-400 border-rose-500/30",
@@ -33,6 +34,13 @@ function formatDuration(startedAt: string, completedAt: string | null) {
   return `${Math.floor(mins / 60)}h ${mins % 60}m`;
 }
 
+function formatWorkoutDate(value: string) {
+  const date = new Date(value);
+  const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${weekdays[date.getUTCDay()]}, ${months[date.getUTCMonth()]} ${date.getUTCDate()}`;
+}
+
 type Workout = {
   id: number;
   name: string;
@@ -47,11 +55,15 @@ type Workout = {
 export function WorkoutCard({ workout }: { workout: Workout }) {
   const [pending, startTransition] = useTransition();
   const router = useRouter();
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
-  function handleDelete(e: React.MouseEvent) {
+  function requestDelete(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    if (!confirm(`Delete "${workout.name}"?`)) return;
+    setConfirmOpen(true);
+  }
+
+  function handleDelete() {
     startTransition(async () => {
       await deleteWorkout(workout.id);
       toast.success("Workout deleted");
@@ -60,18 +72,15 @@ export function WorkoutCard({ workout }: { workout: Workout }) {
   }
 
   return (
+    <>
     <Link href={`/app/workouts/${workout.id}`}>
-      <Card className="surface border-white/10 rounded-2xl hover:bg-white/5 transition-colors">
+      <Card className="surface rounded-3xl border-border transition-colors hover:border-primary/40">
         <CardContent className="p-4">
           <div className="flex items-start justify-between">
             <div>
               <p className="font-semibold">{workout.name}</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {new Date(workout.startedAt).toLocaleDateString(undefined, {
-                  weekday: "short",
-                  month: "short",
-                  day: "numeric",
-                })}
+                {formatWorkoutDate(workout.startedAt)}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -80,15 +89,17 @@ export function WorkoutCard({ workout }: { workout: Workout }) {
                 {formatDuration(workout.startedAt, workout.completedAt)}
               </span>
               <button
-                onClick={handleDelete}
+                type="button"
+                onClick={requestDelete}
                 disabled={pending}
-                className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:text-destructive transition-colors"
+                aria-label={`Delete ${workout.name}`}
+                className="-mr-2 flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground hover:text-destructive transition-colors"
               >
-                <Trash2 className="h-3.5 w-3.5" />
+                <Trash2 className="h-4 w-4" />
               </button>
             </div>
           </div>
-          <div className="mt-3 flex items-center justify-between">
+          <div className="mt-4 flex items-center justify-between gap-3">
             <div className="flex gap-1.5 flex-wrap">
               {workout.muscleGroups.map((mg) => (
                 <Badge
@@ -115,5 +126,16 @@ export function WorkoutCard({ workout }: { workout: Workout }) {
         </CardContent>
       </Card>
     </Link>
+    {/* Rendered outside the Link so dialog clicks don't bubble into navigation */}
+    <ConfirmDialog
+      open={confirmOpen}
+      onOpenChange={setConfirmOpen}
+      title={`Delete "${workout.name}"?`}
+      description="This removes the workout and all of its logged sets."
+      confirmLabel="Delete"
+      destructive
+      onConfirm={handleDelete}
+    />
+    </>
   );
 }

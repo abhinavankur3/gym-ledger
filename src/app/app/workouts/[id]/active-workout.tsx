@@ -17,8 +17,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { Plus, Trash2, Trophy, Check, CheckCircle, X } from "lucide-react";
+import { Plus, Trash2, Trophy, Check, CheckCircle, X, ArrowLeft } from "lucide-react";
+import Link from "next/link";
 import { toast } from "sonner";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 const MUSCLE_GROUP_COLORS: Record<string, string> = {
   chest: "bg-rose-500/20 text-rose-400 border-rose-500/30",
@@ -111,6 +113,7 @@ export function ActiveWorkout({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [removeExerciseId, setRemoveExerciseId] = useState<number | null>(null);
   const [addedExerciseIds, setAddedExerciseIds] = useState<number[]>([]);
   const isCompleted = !!workout.completedAt;
 
@@ -189,7 +192,6 @@ export function ActiveWorkout({
   }
 
   function handleRemoveExercise(exerciseId: number) {
-    if (!confirm("Remove this exercise and all its sets?")) return;
     const hasSets = (setsByExercise[exerciseId] || []).length > 0;
     if (hasSets) {
       startTransition(async () => {
@@ -249,15 +251,25 @@ export function ActiveWorkout({
     ),
   ];
 
+  const loggedSetCount = Object.values(setsByExercise).reduce(
+    (total, sets) => total + sets.length,
+    0
+  );
+  const plannedSetCount = templateExercises?.reduce(
+    (total, exercise) => total + (exercise.targetSets ?? 0),
+    0
+  ) ?? 0;
+
   return (
-    <div className="px-4 pt-8 pb-24">
+    <div className="mx-auto max-w-4xl px-4 pt-5 pb-24 sm:px-6 lg:px-10">
       <BlurFade delay={0}>
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">
-              {workout.name}
-            </h1>
-            <p className="text-xs text-muted-foreground mt-0.5">
+            <Link href="/app/workouts" className="mb-3 inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="h-3.5 w-3.5" /> Workouts
+            </Link>
+            <h1 className="text-3xl font-bold tracking-tight">{workout.name}</h1>
+            <p className="mt-1 text-xs text-muted-foreground">
               {new Date(workout.startedAt).toLocaleDateString(undefined, {
                 weekday: "short",
                 month: "short",
@@ -271,7 +283,7 @@ export function ActiveWorkout({
               onClick={handleComplete}
               disabled={pending || loggedExerciseIds.length === 0}
               size="sm"
-              className="rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 gap-1.5"
+              className="rounded-xl bg-primary px-4 font-bold text-primary-foreground hover:bg-primary/90 gap-1.5"
             >
               <CheckCircle className="h-4 w-4" />
               Finish
@@ -279,6 +291,17 @@ export function ActiveWorkout({
           )}
         </div>
       </BlurFade>
+
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:max-w-md">
+        <div className="rounded-2xl border border-border bg-card px-4 py-3">
+          <p className="text-2xl font-bold">{loggedSetCount}</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Sets logged</p>
+        </div>
+        <div className="rounded-2xl border border-border bg-card px-4 py-3">
+          <p className="text-2xl font-bold">{plannedSetCount || "—"}</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Target sets</p>
+        </div>
+      </div>
 
       {/* Exercise sections */}
       <div className="mt-6 space-y-4">
@@ -301,15 +324,15 @@ export function ActiveWorkout({
             <BlurFade key={exerciseId} delay={0.05 * (i + 1)}>
               <Card
                 className={cn(
-                  "surface rounded-2xl",
+                  "surface rounded-3xl",
                   isGhost
-                    ? "border-dashed border-white/10"
-                    : "border-white/10"
+                    ? "border-dashed border-border/70"
+                    : "border-border"
                 )}
               >
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between gap-2">
-                    <CardTitle className="text-base flex-1 min-w-0 truncate">
+                  <CardTitle className="flex-1 min-w-0 truncate text-lg">
                       {displayName}
                       {isGhost && (
                         <span className="text-xs text-muted-foreground ml-2">
@@ -331,11 +354,13 @@ export function ActiveWorkout({
                       )}
                       {!isCompleted && (
                         <button
-                          onClick={() => handleRemoveExercise(exerciseId)}
+                          type="button"
+                          onClick={() => setRemoveExerciseId(exerciseId)}
                           disabled={pending}
-                          className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:text-destructive transition-colors"
+                          aria-label="Remove exercise from workout"
+                          className="-mr-2 flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground hover:text-destructive transition-colors"
                         >
-                          <X className="h-3.5 w-3.5" />
+                          <X className="h-4 w-4" />
                         </button>
                       )}
                     </div>
@@ -360,7 +385,7 @@ export function ActiveWorkout({
                         {/* Set headers */}
                         {sets.length > 0 && (
                           <div className={cn(
-                            "gap-2 text-[10px] text-muted-foreground uppercase tracking-wider px-1 grid",
+                            "grid gap-2 px-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground",
                             isDuration
                               ? "grid-cols-[2rem_1fr_1fr_2rem]"
                               : "grid-cols-[2rem_1fr_1fr_1fr_2rem]"
@@ -387,11 +412,11 @@ export function ActiveWorkout({
                           <div
                             key={set.id}
                             className={cn(
-                              "gap-2 items-center rounded-lg px-1 py-1.5 text-sm grid",
+                              "grid items-center gap-2 rounded-xl px-2 py-2 text-sm",
                               isDuration
                                 ? "grid-cols-[2rem_1fr_1fr_2rem]"
                                 : "grid-cols-[2rem_1fr_1fr_1fr_2rem]",
-                              set.isPr && "bg-amber-500/10 border border-amber-500/20 rounded-xl"
+                              set.isPr && "border border-primary/25 bg-primary/10"
                             )}
                           >
                             <span className="text-muted-foreground text-xs">
@@ -455,7 +480,7 @@ export function ActiveWorkout({
                                   onChange={(e) =>
                                     updateNewSet(exerciseId, "duration", e.target.value)
                                   }
-                                  className="h-9 rounded-lg bg-white/5 border-white/10 text-sm"
+                                  className="h-10 rounded-xl border-border bg-background text-sm"
                                 />
                                 <Select
                                   value={getNewSet(exerciseId).setType}
@@ -464,7 +489,7 @@ export function ActiveWorkout({
                                     updateNewSet(exerciseId, "setType", v);
                                   }}
                                 >
-                                  <SelectTrigger className="h-9 rounded-lg bg-white/5 border-white/10 text-xs">
+                                    <SelectTrigger className="h-10 rounded-xl border-border bg-background text-xs">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -483,7 +508,7 @@ export function ActiveWorkout({
                                   onChange={(e) =>
                                     updateNewSet(exerciseId, "weight", e.target.value)
                                   }
-                                  className="h-9 rounded-lg bg-white/5 border-white/10 text-sm"
+                                  className="h-10 rounded-xl border-border bg-background text-sm"
                                 />
                                 <Input
                                   type="number"
@@ -493,7 +518,7 @@ export function ActiveWorkout({
                                   onChange={(e) =>
                                     updateNewSet(exerciseId, "reps", e.target.value)
                                   }
-                                  className="h-9 rounded-lg bg-white/5 border-white/10 text-sm"
+                                  className="h-10 rounded-xl border-border bg-background text-sm"
                                 />
                                 <Select
                                   value={getNewSet(exerciseId).setType}
@@ -502,7 +527,7 @@ export function ActiveWorkout({
                                     updateNewSet(exerciseId, "setType", v);
                                   }}
                                 >
-                                  <SelectTrigger className="h-9 rounded-lg bg-white/5 border-white/10 text-xs">
+                                  <SelectTrigger className="h-10 rounded-xl border-border bg-background text-xs">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -517,7 +542,7 @@ export function ActiveWorkout({
                             <button
                               onClick={() => handleAddSet(exerciseId)}
                               disabled={pending}
-                              className="flex items-center justify-center h-9 w-9 rounded-lg bg-primary text-primary-foreground"
+                              className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground"
                             >
                               <Check className="h-4 w-4" />
                             </button>
@@ -539,7 +564,7 @@ export function ActiveWorkout({
           <Button
             variant="outline"
             onClick={() => setPickerOpen(true)}
-            className="w-full h-12 rounded-xl border-dashed border-white/20 text-muted-foreground hover:text-foreground"
+            className="h-12 w-full rounded-2xl border-dashed border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Exercise
@@ -553,6 +578,15 @@ export function ActiveWorkout({
         onOpenChange={setPickerOpen}
         onSelect={handlePickExercise}
         exercises={allExercises}
+      />
+      <ConfirmDialog
+        open={removeExerciseId !== null}
+        onOpenChange={(open) => !open && setRemoveExerciseId(null)}
+        title="Remove this exercise?"
+        description="Any sets you've logged for it in this workout will be deleted."
+        confirmLabel="Remove"
+        destructive
+        onConfirm={() => removeExerciseId !== null && handleRemoveExercise(removeExerciseId)}
       />
     </div>
   );

@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { KeyRound, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 type User = {
   id: number;
@@ -37,8 +38,9 @@ export function UserTable({ users }: { users: User[] }) {
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [newPassword, setNewPassword] = useState("");
 
+  const [deleteUserId, setDeleteUserId] = useState<number | null>(null);
+
   async function handleDelete(userId: number) {
-    if (!confirm("Are you sure you want to delete this user?")) return;
     const result = await deleteUser(userId);
     if (result?.error) {
       toast.error(result.error);
@@ -114,7 +116,7 @@ export function UserTable({ users }: { users: User[] }) {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 rounded-lg hover:bg-destructive/20 text-destructive"
-                        onClick={() => handleDelete(user.id)}
+                        onClick={() => setDeleteUserId(user.id)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -156,6 +158,16 @@ export function UserTable({ users }: { users: User[] }) {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={deleteUserId !== null}
+        onOpenChange={(open) => !open && setDeleteUserId(null)}
+        title="Delete this user?"
+        description="This cannot be undone."
+        confirmLabel="Delete user"
+        destructive
+        onConfirm={() => deleteUserId !== null && handleDelete(deleteUserId)}
+      />
     </>
   );
 }

@@ -69,15 +69,15 @@ export default function NewWorkoutPage() {
     const template = templates.find((t) => t.id === templateId);
 
     return (
-      <div className="px-4 pt-8">
+      <main className="px-4 pt-8">
         <BlurFade delay={0}>
-          <h1 className="text-2xl font-bold tracking-tight">Start Workout</h1>
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Ready when you are</p><h1 className="mt-1 text-3xl font-bold tracking-tight">Start workout</h1>
         </BlurFade>
 
         <BlurFade delay={0.1}>
           <div className="mt-6 space-y-4">
             {template ? (
-              <Card className="surface border-white/10 rounded-2xl">
+              <Card className="surface rounded-3xl border-border">
                 <CardContent className="p-5">
                   <div className="flex items-center gap-3 mb-3">
                     <FileText className="h-5 w-5 text-primary" />
@@ -110,7 +110,7 @@ export default function NewWorkoutPage() {
             <Button
               onClick={() => handleStartFromTemplate(templateId)}
               disabled={pending}
-              className="w-full h-14 rounded-2xl bg-primary text-primary-foreground font-bold text-base hover:bg-primary/90"
+            className="h-14 w-full rounded-2xl bg-primary text-base font-bold text-primary-foreground hover:bg-primary/90"
             >
               <Dumbbell className="h-5 w-5 mr-2" />
               {pending
@@ -126,14 +126,14 @@ export default function NewWorkoutPage() {
             </button>
           </div>
         </BlurFade>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="px-4 pt-8">
+    <main className="px-4 pt-8">
       <BlurFade delay={0}>
-        <h1 className="text-2xl font-bold tracking-tight">New Workout</h1>
+        <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Training log</p><h1 className="mt-1 text-3xl font-bold tracking-tight">New workout</h1>
       </BlurFade>
 
       {/* From Template Section */}
@@ -141,7 +141,7 @@ export default function NewWorkoutPage() {
         <BlurFade delay={0.05}>
           <div className="mt-6">
             <p className="text-xs text-muted-foreground mb-2">From template</p>
-            <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
+              <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
               {templates.map((t) => (
                 <button
                   key={t.id}
@@ -149,7 +149,7 @@ export default function NewWorkoutPage() {
                   disabled={pending}
                   className="flex-shrink-0 w-36"
                 >
-                  <Card className="surface border-white/10 rounded-2xl hover:bg-white/5 transition-colors h-full">
+                  <Card className="surface h-full rounded-2xl border-border transition-colors hover:border-primary/40">
                     <CardContent className="p-3">
                       <FileText className="h-4 w-4 text-primary mb-1" />
                       <p className="text-sm font-medium truncate">{t.name}</p>
@@ -173,7 +173,7 @@ export default function NewWorkoutPage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Push Day"
-              className="h-12 rounded-xl bg-white/5 border-white/10"
+              className="h-12 rounded-xl border-border bg-card"
               autoFocus
             />
           </div>
@@ -185,7 +185,7 @@ export default function NewWorkoutPage() {
                 <button
                   key={qn}
                   onClick={() => setName(qn)}
-                  className="rounded-full px-3 py-1.5 text-xs font-medium border border-white/10 text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors"
+              className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
                 >
                   {qn}
                 </button>
@@ -196,13 +196,13 @@ export default function NewWorkoutPage() {
           <Button
             onClick={handleStart}
             disabled={pending || !name.trim()}
-            className="w-full h-14 rounded-2xl bg-primary text-primary-foreground font-bold text-base hover:bg-primary/90 mt-4"
+            className="mt-4 h-14 w-full rounded-2xl bg-primary text-base font-bold text-primary-foreground hover:bg-primary/90"
           >
             <Dumbbell className="h-5 w-5 mr-2" />
             {pending ? "Starting..." : "Start Workout"}
           </Button>
         </div>
       </BlurFade>
-    </div>
+    </main>
   );
 }
