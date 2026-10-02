@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { regeneratePlan, confirmPlan } from "./actions";
 import { PlanDayCard, dayTone } from "./plan-day-card";
+import { sessionTone } from "@/lib/muscles";
 import { WEEKDAY_LABELS, trainingWeekdays, type Plan } from "@/lib/ai/plan-types";
 
 const FEEDBACK_LIMIT = 600;
@@ -50,7 +51,8 @@ export function PlanReview({ plan, feedback: initialFeedback }: { plan: Plan; fe
     <div className="relative" aria-busy={regenerating}>
       <div className={cn("grid gap-4 sm:grid-cols-2 transition-opacity", regenerating && "pointer-events-none opacity-30")}>
         {plan.days.map((day, index) => {
-          const tone = dayTone(day.name);
+          const muscles = day.exercises.map((e) => e.muscle).filter((m): m is NonNullable<typeof m> => !!m);
+          const tone = muscles.length ? sessionTone(muscles) : dayTone(day.name);
           return (
             <PlanDayCard
               key={`${day.name}-${index}`}

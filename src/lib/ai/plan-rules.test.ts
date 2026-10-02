@@ -63,18 +63,59 @@ describe("resolvePlan", () => {
     expect(resolved.days[0].exercises[0].exercise).toBe("Barbell Bench Press");
   });
 
-  it("drops exercises that aren't in the catalog", () => {
+  it("keeps exercises outside the library with the muscle and category the model gave", () => {
     const plan: Plan = {
       name: "Plan",
       days: [
-        day("A", ["Barbell Bench Press", "Barbell Row", "Imaginary Press"]),
+        { name: "A", exercises: [{ exercise: "Landmine Press", muscle: "shoulders", category: "barbell", sets: 3, reps: "8-10", rir: 2 }, ...day("A", ["Barbell Row"]).exercises] },
         day("B", ["Barbell Squat", "Leg Curl"]),
         day("C", ["Overhead Press", "Lat Pulldown"]),
         day("D", ["Leg Press", "Hip Thrust"]),
       ],
     };
-    const names = resolvePlan(plan, CATALOG, profile).days.flatMap((d) => d.exercises.map((e) => e.exercise));
-    expect(names).not.toContain("Imaginary Press");
+    const first = resolvePlan(plan, CATALOG, profile).days[0].exercises[0];
+    expect(first).toMatchObject({ exercise: "Landmine Press", muscle: "shoulders", category: "barbell" });
+  });
+
+  it("matches library names loosely and takes the library's muscle and category", () => {
+    const plan: Plan = {
+      name: "Plan",
+      days: [day("A", ["barbell bench-press", "Push Ups"]), day("B", ["Barbell Squat", "Leg Curl"]), day("C", ["Overhead Press", "Lat Pulldown"]), day("D", ["Leg Press", "Hip Thrust"])],
+    };
+    const [bench, push] = resolvePlan(plan, CATALOG, profile).days[0].exercises;
+    expect(bench).toMatchObject({ exercise: "Barbell Bench Press", muscle: "chest", category: "barbell" });
+    expect(push.exercise).toBe("Push-Up");
+  });
+
+  it("defaults unknown muscle/category and cleans names", () => {
+    const plan: Plan = {
+      name: "Plan",
+      days: [
+        { name: "A", exercises: [{ exercise: "Sled <b>Push</b>!!", muscle: "nope" as never, category: "?" as never, sets: 3, reps: "20m", rir: 2 }, ...day("A", ["Barbell Row"]).exercises] },
+        day("B", ["Barbell Squat", "Leg Curl"]), day("C", ["Overhead Press", "Lat Pulldown"]), day("D", ["Leg Press", "Hip Thrust"]),
+      ],
+    };
+    expect(resolvePlan(plan, CATALOG, profile).days[0].exercises[0]).toMatchObject({ exercise: "Sled Push", muscle: "full_body", category: "other" });
+  });
+
+  it("removes anything on the avoid list, including new exercises the model invents", () => {
+    const plan: Plan = {
+      name: "Plan",
+      days: [
+        day("A", ["Barbell Bench Press", "Barbell Row", "Zercher Squat"]),
+        day("B", ["Barbell Squat", "Leg Curl", "Hip Thrust"]),
+        day("C", ["Overhead Press", "Lat Pulldown"]),
+        day("D", ["Romanian Deadlift", "Hip Thrust", "Leg Curl"]),
+      ],
+    };
+    const names = resolvePlan(plan, CATALOG, { ...profile, avoidMovements: "no squats" }).days.flatMap((d) => d.exercises.map((e) => e.exercise));
+    expect(names.some((n) => /squat/i.test(n))).toBe(false);
+    expect(names).toContain("Leg Curl");
+  });
+
+  it("drops duplicate exercises within a day", () => {
+    const plan: Plan = { name: "Plan", days: [day("A", ["Barbell Row", "barbell row", "Lat Pulldown"]), day("B", ["Barbell Squat", "Leg Curl"]), day("C", ["Overhead Press", "Lat Pulldown"]), day("D", ["Leg Press", "Hip Thrust"])] };
+    expect(resolvePlan(plan, CATALOG, profile).days[0].exercises.map((e) => e.exercise)).toEqual(["Barbell Row", "Lat Pulldown"]);
   });
 
   it("fills missing days from the fallback to match the schedule", () => {
@@ -90,8 +131,8 @@ describe("resolvePlan", () => {
     expect(resolvePlan(plan, CATALOG, profile).days).toHaveLength(4);
   });
 
-  it("falls back entirely when the model's plan is mostly unusable", () => {
-    const plan: Plan = { name: "Bad", days: [day("A", ["Nope", "Nada"]), day("B", ["Fake Lift", "Barbell Row"])] };
+  it("falls back entirely when the model's plan is unusable", () => {
+    const plan: Plan = { name: "Bad", days: [day("A", ["!!", "x"]), day("B", ["", "Barbell Row"])] };
     const resolved = resolvePlan(plan, CATALOG, profile);
     expect(resolved).toEqual(deterministicPlan(profile, CATALOG));
   });

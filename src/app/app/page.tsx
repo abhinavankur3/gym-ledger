@@ -2,7 +2,7 @@ import { eq, and, gte, desc, sql } from "drizzle-orm";
 import Link from "next/link";
 import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/dal";
-import { gymAttendance, workouts, bodyMetrics, planDrafts } from "@/lib/db/schema";
+import { gymAttendance, workouts, bodyMetrics, planDrafts, nutritionPlans } from "@/lib/db/schema";
 import { getRoutineWeek, getTodayTemplate } from "./routines/actions";
 import { startOrResumeSession } from "./workouts/actions";
 import { SubmitButton } from "@/components/submit-button";
@@ -22,7 +22,7 @@ import {
   startOfLocalDayIso,
   startOfLocalWeekIso,
 } from "@/lib/dates";
-import { ChevronRight, Scale, Sparkles } from "lucide-react";
+import { ChevronRight, Salad, Scale, Sparkles } from "lucide-react";
 
 const WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const TONE_ART = { push: "dumbbell", pull: "kettlebell", legs: "plate", sun: "kettlebell" } as const;
@@ -33,14 +33,16 @@ export default async function AppDashboard() {
   const now = new Date();
   const today = localWeekday(now, tz);
 
-  const [activeCheckIn, weekWorkouts, latestWeight, todayTemplate, routineWeek, pendingPlan] = await Promise.all([
+  const [activeCheckIn, weekWorkouts, latestWeight, todayTemplate, routineWeek, pendingPlan, mealPlan] = await Promise.all([
     db.query.gymAttendance.findFirst({ where: and(eq(gymAttendance.userId, user.id), gte(gymAttendance.checkIn, startOfLocalDayIso(now, tz)), sql`${gymAttendance.checkOut} IS NULL`) }),
     db.query.workouts.findMany({ where: and(eq(workouts.userId, user.id), gte(workouts.startedAt, startOfLocalWeekIso(now, tz))), columns: { startedAt: true, templateId: true, completedAt: true } }),
     db.query.bodyMetrics.findFirst({ where: and(eq(bodyMetrics.userId, user.id), eq(bodyMetrics.metricType, "weight")), orderBy: [desc(bodyMetrics.date)] }),
     getTodayTemplate(),
     getRoutineWeek(),
     db.query.planDrafts.findFirst({ where: eq(planDrafts.userId, user.id), columns: { id: true } }),
+    db.query.nutritionPlans.findFirst({ where: and(eq(nutritionPlans.userId, user.id), eq(nutritionPlans.status, "active")), columns: { id: true } }),
   ]);
+  const hasMealPlan = !!mealPlan;
 
   const doneDays = [...new Set(weekWorkouts.map((w) => localWeekday(new Date(w.startedAt), tz)))];
   const plannedDays = routineWeek.map((d) => d.dayOfWeek);
@@ -69,6 +71,17 @@ export default async function AppDashboard() {
           <span className="min-w-0 flex-1">
             <span className="block font-semibold">Your plan is ready to review</span>
             <span className="mt-0.5 block text-sm text-muted-foreground">Confirm it, or ask for changes.</span>
+          </span>
+          <ChevronRight className="h-5 w-5 text-muted-foreground" />
+        </Link>
+      )}
+
+      {!pendingPlan && !hasMealPlan && (
+        <Link href="/app/nutrition" className="mt-5 flex items-center gap-3 rounded-3xl bg-card p-4 shadow-soft">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-legs text-ink"><Salad className="h-5 w-5" /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Build your meal plan</span>
+            <span className="mt-0.5 block text-sm text-muted-foreground">A week of local meals matched to your targets.</span>
           </span>
           <ChevronRight className="h-5 w-5 text-muted-foreground" />
         </Link>

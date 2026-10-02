@@ -27,12 +27,14 @@ After onboarding:
 ## 2. AI plan generation
 
 - OpenRouter for model access.
-- Qwen3 32B generates candidate workout plans.
+- Qwen 3.7 Flash (`qwen/qwen3.7-flash`) generates workout and meal plans, and will read food photos in Phase 2. It replaced Qwen3 32B: cheaper, faster, and it accepts images. Reasoning is switched off for structured calls.
 - Typesafe Jev scores the candidates.
 - Synchronous for now: 30 s generation timeout, 10 s Jev timeout.
 - Deterministic fallback plan when OpenRouter is unavailable, the model times out, returns invalid JSON, or uses unsupported exercises.
 
-The AI must use only catalog exercises; respect equipment, experience, schedule and duration; generate exactly the requested number of training days; produce structured JSON; avoid medical advice; and return practical, sustainable plans.
+**The AI is not restricted to a catalog** (decision 2026-10-03) for exercises or dishes. Exercises it names that the library doesn't have are added when the plan is confirmed; names that match the library reuse it so history and PRs carry over. Dishes are free-form with per-item nutrition from the model, checked by code. A small built-in exercise list and a 63-dish set exist only as offline fallbacks.
+
+The AI must respect equipment, experience, schedule and duration; generate exactly the requested number of training days; produce structured JSON; avoid medical advice; and return practical, sustainable plans.
 
 ## 3. AI feedback and guardrails
 
@@ -65,7 +67,9 @@ Feedback (and any free text from onboarding) is untrusted input:
 
 ## 7. Nutrition
 
-- Meal plans generated from goal, body metrics, activity level, dietary preferences, restrictions and dislikes.
+- Daily targets computed in code: Mifflin-St Jeor (general), ten Haaf 2014 (trained users), Cunningham (when body fat is logged); activity and training energy added; goal adjustment (−20% fat loss, +10% muscle gain); protein 1.6–2.0 g/kg by goal. Recomputed from the latest logged weight.
+- Region inferred from the browser time zone (country level); optional regional cuisine choice (India: North/South/East/West) on the meal plan screen.
+- Meal plans generated from goal, targets, diet type (incl. eggetarian and Jain), cuisine, and foods to avoid.
 - Easy meal logging with minimal taps.
 - Recommendations adapt to adherence and progress over time.
 - Nutrition is a main navigation section.
@@ -86,17 +90,17 @@ The natural-language layer over the structured data: explain why a workout chang
 
 ---
 
-## Status (as of 2026-10-02)
+## Status (as of 2026-10-03)
 
 | Section | Status |
 |---|---|
 | 1 Onboarding | Done, including separate movements/foods to avoid and "Update my answers" |
-| 2 AI generation | Done; unsupported exercises are dropped, fallback only if a day falls below 2 exercises |
-| 3 Guardrails | Done for plan feedback and onboarding avoid-text; avoided movements are removed from the catalog before generation |
+| 2 AI generation | Done on Qwen 3.7 Flash; exercises free-form (new ones added to the library on confirm); fallback if output is invalid or a day has fewer than 2 usable exercises |
+| 3 Guardrails | Done for plan feedback, meal feedback and onboarding avoid-text; avoided movements and foods are removed from whatever the model returns |
 | 4 Plan review | Done |
 | 5 Routine overhaul | Done, with "Your plan" at `/app/plan` (view, change via feedback, update answers). Legacy detail/editor routes were deleted rather than kept |
 | 6 Workout logging | Done: Home starts/resumes the session directly, prefilled sets, one-tap completion, rest timer, set-level progressive overload |
-| 7 Nutrition | Nav tab + placeholder only |
+| 7 Nutrition | Targets and AI meal plans done (Phase 1); logging is Phase 2 |
 | 8 Adaptive progression | Only per-set weight/rep suggestions |
 | 9 Queues | Deferred, as planned |
 | 10 Coach | Placeholder only |
@@ -113,15 +117,16 @@ Each phase ends with a commit.
 - Vitest with tests for set suggestions, plan validation and input sanitising.
 - Rename the product to Kochi.
 
-### Phase 1 — nutrition foundations (deterministic)
-- Daily calorie and protein targets from profile + goal (BMR × activity, goal adjustment, protein per kg), recalculated on weight change.
-- Fast meal logging: calories + protein, saved meals, "same as yesterday", one-tap repeats.
-- Nutrition home: today's targets vs logged.
-- Tables: `nutrition_targets`, `meals`, `meal_logs`.
+### Phase 1 — nutrition plan and regional diet ✅
+- Daily calorie and macro targets in code (formulas above), with a "how Kochi worked this out" breakdown.
+- Region from time zone; optional sub-regional cuisine; eggetarian and Jain diets.
+- AI weekly meal plan (4 distinct days rotated through the week) with draft → review → feedback → confirm; code enforces diet, avoid-list and sane numbers and scales portions to the target; offline fallback from the built-in dish set.
+- Workout plans no longer limited to the exercise library; avoided movements still removed.
 
-### Phase 2 — AI meal plans
-- Weekly meal plan from goal, body, diet and avoid-list via the same draft → review → confirm flow and guardrails, with a deterministic fallback.
-- "I ate this" one-tap logging from the plan; swap a meal.
+### Phase 2 — nutrition logging and tracking
+- Path 1: estimate intake from the meal plan — one tap "ate as planned", portion adjust, swap.
+- Path 2: food photo → Qwen 3.7 Flash identifies dishes and portions → user confirms. Benchmark on real regional meals before launch.
+- Daily intake vs targets; history.
 
 ### Phase 3 — adaptive engine (rules, not AI)
 - Weekly review of adherence, missed sessions, lift trends, body-weight trend, meal adherence and feedback.

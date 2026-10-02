@@ -1,8 +1,16 @@
+export const MUSCLE_GROUPS = ["chest", "back", "shoulders", "biceps", "triceps", "forearms", "quads", "hamstrings", "glutes", "calves", "core", "full_body"] as const;
+export const EXERCISE_CATEGORIES = ["barbell", "dumbbell", "machine", "cable", "bodyweight", "cardio", "other"] as const;
+export type MuscleGroup = (typeof MUSCLE_GROUPS)[number];
+export type ExerciseCategory = (typeof EXERCISE_CATEGORIES)[number];
+
 export type PlanExercise = {
+  /** Any clear exercise name; matched to the library by name when it already exists */
   exercise: string;
   sets: number;
   reps: string;
   rir: number;
+  muscle?: MuscleGroup;
+  category?: ExerciseCategory;
 };
 
 export type Plan = {

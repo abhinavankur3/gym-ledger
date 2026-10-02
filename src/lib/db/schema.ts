@@ -137,6 +137,8 @@ export const userProfiles = sqliteTable("user_profiles", {
   restrictions: text("restrictions"),
   /** Movements, injuries or constraints to avoid in training. Untrusted free text. */
   avoidMovements: text("avoid_movements"),
+  /** Optional sub-regional cuisine (India): north | south | east | west. Null = mixed. */
+  cuisineRegion: text("cuisine_region"),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
 });
@@ -186,3 +188,23 @@ export const routineDaysRelations = relations(routineDays, ({ one }) => ({
   routine: one(routines, { fields: [routineDays.routineId], references: [routines.id] }),
   template: one(workoutTemplates, { fields: [routineDays.templateId], references: [workoutTemplates.id] }),
 }));
+
+/** Meal plans: one draft (under review) and one active plan per user; older ones archived. */
+export const nutritionPlans = sqliteTable(
+  "nutrition_plans",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    status: text("status", { enum: ["draft", "active", "archived"] }).notNull(),
+    planJson: text("plan_json").notNull(),
+    /** Targets the plan was built for, so later target changes are visible */
+    targetsJson: text("targets_json").notNull(),
+    /** Where the plan came from: the model, or the offline fallback */
+    source: text("source", { enum: ["ai", "fallback"] }).notNull(),
+    cuisine: text("cuisine").notNull(),
+    feedback: text("feedback"),
+    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+    updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
+  },
+  (table) => [index("idx_nutrition_plans_user_status").on(table.userId, table.status)]
+);

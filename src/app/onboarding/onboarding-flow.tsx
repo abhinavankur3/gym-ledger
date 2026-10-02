@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { GeneratingOverlay } from "@/components/generating-overlay";
 import { ArrowLeft, Check, Loader2 } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
-import { EquipmentArt } from "@/components/equipment-art";
 
 type Option = readonly [value: string, title: string, description?: string];
 
@@ -28,7 +28,7 @@ const choices = {
   sex: [["male", "Male"], ["female", "Female"], ["prefer_not_to_say", "Prefer not to say"]],
   activityLevel: [["sedentary", "Mostly sitting", "Little movement outside training"], ["light", "Lightly active", "Some walking or active hobbies"], ["moderate", "Moderately active", "On my feet most days"], ["very_active", "Very active", "Physical work or lots of movement"]],
   equipment: [["full_gym", "Full gym", "Barbells, machines, cables"], ["dumbbells", "Dumbbells", "A pair of adjustable or fixed dumbbells"], ["home_gym", "Home gym", "A personal setup with some equipment"], ["bodyweight", "Bodyweight", "Minimal or no equipment"]],
-  dietaryPreferences: [["none", "No restrictions", "I eat a varied diet"], ["vegetarian", "Vegetarian", "No meat or fish"], ["vegan", "Vegan", "No animal products"]],
+  dietaryPreferences: [["none", "No restrictions", "I eat a varied diet"], ["vegetarian", "Vegetarian", "No meat or fish"], ["eggetarian", "Eggetarian", "Vegetarian, plus eggs"], ["vegan", "Vegan", "No animal products"], ["jain", "Jain", "No onion, garlic or root vegetables"]],
 } as const satisfies Record<string, readonly Option[]>;
 
 type FormState = { goal: string; experience: string; age: string; sex: string; height: string; weight: string; activityLevel: string; trainingDays: string; sessionDuration: string; equipment: string; dietaryPreferences: string; restrictions: string; avoidMovements: string };
@@ -100,7 +100,7 @@ export function OnboardingFlow({ saved }: { saved?: OnboardingAnswers }) {
 
   return (
     <main className="flex min-h-screen items-center justify-center px-4 py-8">
-      {pending && <GeneratingOverlay />}
+      {pending && <GeneratingOverlay title="Building your plan" watermark="Plan" body="Matching exercises to your schedule and equipment. This can take up to a minute, so keep this screen open." />}
       <div className="w-full max-w-lg">
         <div className="mb-8 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -208,26 +208,6 @@ export function OnboardingFlow({ saved }: { saved?: OnboardingAnswers }) {
         </form>
       </div>
     </main>
-  );
-}
-
-function GeneratingOverlay() {
-  return (
-    <div role="status" aria-live="polite" className="fixed inset-0 z-50 flex items-center justify-center bg-[#0b0e2a]/60 px-4 backdrop-blur-md">
-      <div className="relative w-full max-w-sm">
-        <div className="relative h-36 overflow-hidden rounded-t-[2rem] bg-sun text-ink">
-          <span aria-hidden className="pointer-events-none absolute -left-2 top-6 select-none whitespace-nowrap font-display text-[6.5rem] leading-none text-white/30">Plan</span>
-          <EquipmentArt kind="kettlebell" className="animate-hero-drop absolute -bottom-6 right-4 w-28" />
-        </div>
-        <div className="rounded-b-[2rem] bg-card p-7 shadow-lift">
-          <div className="flex items-center gap-3">
-            <Loader2 className="h-5 w-5 animate-spin text-primary" />
-            <p className="font-display text-2xl">Building your plan<span className="text-primary">.</span></p>
-          </div>
-          <p className="mt-3 text-sm leading-6 text-muted-foreground">Matching exercises to your schedule and equipment. This can take up to a minute, so keep this screen open.</p>
-        </div>
-      </div>
-    </div>
   );
 }
 

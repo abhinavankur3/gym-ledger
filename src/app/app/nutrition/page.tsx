@@ -1,21 +1,136 @@
-import { CalendarDays, Camera, Target } from "lucide-react";
-import { SessionHero } from "@/components/session-hero";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { ChevronRight } from "lucide-react";
 import { ProfileButton } from "@/components/layout/page-header";
-import { PlannedFeatures } from "../coach/placeholder";
+import { SessionHero } from "@/components/session-hero";
+import { getUserTimeZone, localWeekday } from "@/lib/dates";
+import { METHOD_LABEL, type NutritionTargets } from "@/lib/nutrition/targets";
+import { getNutritionState } from "./actions";
+import { BuildMealPlan, ConfirmMealPlan, CuisinePicker, MealFeedback, WeekMeals } from "./meal-plan-client";
 
-export default function NutritionPage() {
+const DIET_LABEL = { none: "No restrictions", vegetarian: "Vegetarian", vegan: "Vegan", eggetarian: "Eggetarian", jain: "Jain" } as const;
+
+export default async function NutritionPage() {
+  const state = await getNutritionState();
+  if (!state) redirect("/onboarding");
+  const today = localWeekday(new Date(), await getUserTimeZone());
+  const { targets, active, draft } = state;
+
   return (
     <main className="pb-6">
       <div className="flex justify-end pt-6 md:pt-10"><ProfileButton /></div>
-      <SessionHero tone="legs" kicker="Nutrition" title="Fuel the plan" watermark="Fuel" art="bowl" asHeading className="mt-3" />
-      <PlannedFeatures
-        intro="Nutrition is being built into Kochi so meals and training share one plan."
-        features={[
-          { icon: Target, title: "Daily targets", detail: "Calories and protein worked out from your goal, body and training days." },
-          { icon: CalendarDays, title: "A meal plan that fits", detail: "Suggestions that respect your diet and anything you avoid." },
-          { icon: Camera, title: "Effortless logging", detail: "Describe a meal in a few words and Kochi fills in the rest." },
-        ]}
+      <SessionHero
+        tone="legs"
+        kicker={draft ? "New meal plan to review" : active ? "Your meals" : "Nutrition"}
+        title={draft ? "Review your meals" : active ? "Eat to the plan" : "Fuel the plan"}
+        watermark="Fuel"
+        art="bowl"
+        asHeading
+        meta={`${targets.kcal.toLocaleString()} kcal and ${targets.protein} g protein a day`}
+        className="mt-3"
       />
+
+      <div className="mt-16 space-y-6">
+        <TargetsCard targets={targets} weightFromLog={state.weightFromLog} />
+
+        {draft ? (
+          <>
+            <section aria-labelledby="draft-heading">
+              <h2 id="draft-heading" className="font-display text-2xl">Your new week</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {draft.cuisine}, {DIET_LABEL[state.diet].toLowerCase()}.{draft.source === "fallback" && " Built from Kochi's simpler offline plan because the AI wasn't available."}
+                {active && " Your current plan stays until you confirm this one."}
+              </p>
+              <div className="mt-4"><WeekMeals plan={draft.plan} targets={draft.targets} today={today} /></div>
+            </section>
+            <ConfirmMealPlan hasActive={!!active} />
+            <MealFeedback initial={draft.feedback} title="Want a change?" hint="Tell Kochi what to swap, add or avoid, then build another version." cta="Build another version" />
+          </>
+        ) : active ? (
+          <>
+            <section aria-labelledby="week-heading">
+              <h2 id="week-heading" className="font-display text-2xl">{active.plan.name}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">{active.cuisine}, {DIET_LABEL[state.diet].toLowerCase()}.</p>
+              {targetsChanged(active.targets, targets) && (
+                <p className="mt-3 rounded-2xl bg-sun/25 px-4 py-3 text-sm">Your targets have moved since this plan was built. Build a new version below to match them.</p>
+              )}
+              <div className="mt-4"><WeekMeals plan={active.plan} targets={targets} today={today} /></div>
+            </section>
+            {state.country?.code === "IN" && (
+              <section aria-labelledby="cuisine-heading" className="rounded-3xl bg-card p-5 shadow-soft dark:ring-1 dark:ring-white/5">
+                <h2 id="cuisine-heading" className="font-display text-xl">Regional food</h2>
+                <p className="mt-1 mb-4 text-sm text-muted-foreground">Kochi plans around Indian home cooking. Pick a region if you&apos;d like it closer to home.</p>
+                <CuisinePicker value={state.indianRegion} />
+              </section>
+            )}
+            <MealFeedback title="Change my meal plan" hint="Tell Kochi what isn't working. You'll review the new week before it replaces this one." cta="Build a new version" />
+          </>
+        ) : (
+          <section aria-labelledby="start-heading" className="rounded-3xl bg-card p-5 shadow-soft dark:ring-1 dark:ring-white/5">
+            <h2 id="start-heading" className="font-display text-xl">A week of meals, built for you</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Kochi plans everyday {state.cuisine.replace(" home cooking", "").replace(" food", "")} meals around these targets, your {DIET_LABEL[state.diet].toLowerCase()} diet and anything you avoid. You&apos;ll review it before it&apos;s saved.
+            </p>
+            {state.country?.code === "IN" && <div className="mt-4"><CuisinePicker value={state.indianRegion} /></div>}
+            <div className="mt-5"><BuildMealPlan /></div>
+          </section>
+        )}
+      </div>
     </main>
+  );
+}
+
+function targetsChanged(a: NutritionTargets, b: NutritionTargets) {
+  return Math.abs(a.kcal - b.kcal) / b.kcal > 0.05 || Math.abs(a.protein - b.protein) > 10;
+}
+
+function TargetsCard({ targets, weightFromLog }: { targets: NutritionTargets; weightFromLog: boolean }) {
+  const b = targets.breakdown;
+  const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : "0");
+  return (
+    <section aria-labelledby="targets-heading" className="rounded-3xl bg-card p-5 shadow-soft dark:ring-1 dark:ring-white/5">
+      <h2 id="targets-heading" className="font-display text-xl">Daily targets</h2>
+      <div className="mt-3 grid grid-cols-4 gap-2 text-center">
+        {[
+          ["Calories", targets.kcal.toLocaleString(), "kcal"],
+          ["Protein", targets.protein, "g"],
+          ["Carbs", targets.carbs, "g"],
+          ["Fat", targets.fat, "g"],
+        ].map(([label, value, unit]) => (
+          <div key={label} className="rounded-2xl bg-muted/60 px-1 py-3">
+            <p className="font-display tabular text-xl">{value}</p>
+            <p className="text-[11px] text-muted-foreground">{unit} {label.toString().toLowerCase()}</p>
+          </div>
+        ))}
+      </div>
+      <details className="group mt-4">
+        <summary className="flex cursor-pointer list-none items-center gap-1 text-sm font-semibold text-primary">
+          How Kochi worked this out <ChevronRight className="h-4 w-4 transition-transform group-open:rotate-90" />
+        </summary>
+        <dl className="mt-3 space-y-1.5 text-sm">
+          <Row label={`Resting energy (${METHOD_LABEL[b.method]})`} value={`${b.rmr} kcal`} />
+          <Row label="Daily life" value={`${b.dailyLife} kcal`} />
+          <Row label="Training, averaged over the week" value={`${signed(b.training)} kcal`} />
+          <Row label="Maintenance" value={`${b.maintenance} kcal`} />
+          <Row label="For your goal" value={`${signed(b.goalAdjustment)} kcal`} />
+          <Row label="Protein" value={`${b.proteinPerKg} g per kg`} />
+        </dl>
+        <p className="mt-3 text-xs leading-5 text-muted-foreground">
+          Formulas are a starting estimate and can be off by 10% for any one person. Kochi will refine these from your real weight trend as you log.
+        </p>
+      </details>
+      {!weightFromLog && (
+        <Link href="/app/metrics" className="mt-3 inline-flex text-sm font-semibold text-primary hover:underline">Log today&apos;s weight to keep this current</Link>
+      )}
+    </section>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between gap-4">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="tabular font-semibold">{value}</dd>
+    </div>
   );
 }

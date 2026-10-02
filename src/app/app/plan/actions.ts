@@ -4,7 +4,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import db from "@/lib/db";
-import { planDrafts, routines, userProfiles, workoutTemplateExercises } from "@/lib/db/schema";
+import { nutritionPlans, planDrafts, routines, userProfiles, workoutTemplateExercises } from "@/lib/db/schema";
 import { verifySession } from "@/lib/auth/dal";
 import { generatePlan, normalizePlanFeedback, persistPlan } from "@/lib/ai/plan-generator";
 import type { Plan } from "@/lib/ai/plan-types";
@@ -105,7 +105,7 @@ export async function confirmPlan() {
   await persistPlan(session.userId, plan!);
   await db.delete(planDrafts).where(eq(planDrafts.userId, session.userId));
   revalidatePath("/app");
-  revalidatePath("/app/routines");
-  revalidatePath("/app/workouts/templates");
-  redirect("/app");
+  // Training is set; if there's no meal plan yet, that's the natural next step
+  const hasMealPlan = await db.query.nutritionPlans.findFirst({ where: eq(nutritionPlans.userId, session.userId), columns: { id: true } });
+  redirect(hasMealPlan ? "/app" : "/app/nutrition");
 }
