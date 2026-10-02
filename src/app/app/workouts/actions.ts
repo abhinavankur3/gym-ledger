@@ -1,6 +1,6 @@
 "use server";
 
-import { eq, and, desc, asc, sql } from "drizzle-orm";
+import { eq, and, desc, asc, sql, inArray, lt, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import db from "@/lib/db";
 import {
@@ -255,4 +255,51 @@ export async function deleteWorkout(workoutId: number) {
 
   revalidatePath("/app/workouts");
   return { success: true };
+}
+
+/**
+ * Working sets from the most recent earlier workout that included each exercise.
+ * Feeds one-tap set suggestions.
+ */
+export async function getLastPerformance(exerciseIds: number[], currentWorkoutId: number) {
+  const session = await verifySession();
+  if (exerciseIds.length === 0) return {};
+
+  const current = await db.query.workouts.findFirst({
+    where: and(eq(workouts.id, currentWorkoutId), eq(workouts.userId, session.userId)),
+    columns: { startedAt: true },
+  });
+  if (!current) return {};
+
+  const rows = await db
+    .select({
+      workoutId: workoutSets.workoutId,
+      exerciseId: workoutSets.exerciseId,
+      setNumber: workoutSets.setNumber,
+      setType: workoutSets.setType,
+      weight: workoutSets.weight,
+      reps: workoutSets.reps,
+      durationSeconds: workoutSets.durationSeconds,
+    })
+    .from(workoutSets)
+    .innerJoin(workouts, eq(workoutSets.workoutId, workouts.id))
+    .where(
+      and(
+        eq(workouts.userId, session.userId),
+        ne(workouts.id, currentWorkoutId),
+        lt(workouts.startedAt, current.startedAt),
+        inArray(workoutSets.exerciseId, exerciseIds),
+        ne(workoutSets.setType, "warmup")
+      )
+    )
+    .orderBy(desc(workouts.startedAt), asc(workoutSets.setNumber));
+
+  const byExercise: Record<number, typeof rows> = {};
+  const sessionFor: Record<number, number> = {};
+  for (const row of rows) {
+    sessionFor[row.exerciseId] ??= row.workoutId;
+    if (row.workoutId !== sessionFor[row.exerciseId]) continue;
+    (byExercise[row.exerciseId] ??= []).push(row);
+  }
+  return byExercise;
 }

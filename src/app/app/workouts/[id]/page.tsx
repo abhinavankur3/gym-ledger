@@ -10,6 +10,8 @@ import {
   workoutTemplateExercises,
 } from "@/lib/db/schema";
 import { ActiveWorkout } from "./active-workout";
+import { getLastPerformance } from "../actions";
+import { getUserTimeZone } from "@/lib/dates";
 
 export default async function WorkoutDetailPage({
   params,
@@ -63,6 +65,7 @@ export default async function WorkoutDetailPage({
   let templateExercises: Array<{
     exerciseId: number;
     name: string;
+    category: string;
     primaryMuscleGroup: string;
     targetSets: number | null;
     targetReps: string | null;
@@ -86,6 +89,7 @@ export default async function WorkoutDetailPage({
       templateExercises = template.exercises.map((te) => ({
         exerciseId: te.exerciseId,
         name: te.exercise.name,
+        category: te.exercise.category,
         primaryMuscleGroup: te.exercise.primaryMuscleGroup,
         targetSets: te.targetSets,
         targetReps: te.targetReps,
@@ -94,6 +98,11 @@ export default async function WorkoutDetailPage({
     }
   }
 
+  const lastPerformance = await getLastPerformance(
+    [...new Set([...exerciseIds, ...(templateExercises ?? []).map((t) => t.exerciseId)])],
+    workout.id
+  );
+
   return (
     <ActiveWorkout
       workout={workout}
@@ -101,6 +110,8 @@ export default async function WorkoutDetailPage({
       exerciseMap={exerciseMap}
       allExercises={allExercises}
       templateExercises={templateExercises}
+      lastPerformance={lastPerformance}
+      dateLabel={new Intl.DateTimeFormat("en-GB", { timeZone: await getUserTimeZone(), weekday: "long", day: "numeric", month: "short" }).format(new Date(workout.startedAt))}
     />
   );
 }
