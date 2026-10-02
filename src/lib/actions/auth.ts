@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import db from "@/lib/db";
-import { users, userPreferences } from "@/lib/db/schema";
+import { users, userPreferences, userProfiles } from "@/lib/db/schema";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { createSession, deleteSession } from "@/lib/auth/session";
 import { requireAdmin, verifySession } from "@/lib/auth/dal";
@@ -38,6 +38,13 @@ export async function login(_prev: unknown, formData: FormData) {
 
   if (user.forcePasswordChange) {
     redirect("/change-password");
+  }
+
+  if (user.role === "user") {
+    const profile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.userId, user.id),
+    });
+    if (!profile) redirect("/onboarding");
   }
 
   if (user.role === "admin") {

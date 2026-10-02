@@ -15,6 +15,20 @@
       "when": 1774974260249,
       "tag": "0001_cynical_mandarin",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789646752993,
+      "tag": "0002_bright_prism",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1790936397814,
+      "tag": "0003_zippy_blizzard",
+      "breakpoints": true
     }
   ]
 }

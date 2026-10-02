@@ -33,3 +33,18 @@ export const bodyMetricSchema = z.object({
   unit: z.string().min(1, "Unit is required"),
   notes: z.string().optional(),
 });
+
+export const onboardingSchema = z.object({
+  goal: z.enum(["lose_fat", "build_muscle", "recomposition", "general_fitness"]),
+  experience: z.enum(["beginner", "intermediate", "advanced"]),
+  age: z.number().int().min(13).max(100),
+  sex: z.enum(["male", "female", "prefer_not_to_say"]),
+  height: z.number().positive().max(300),
+  weight: z.number().positive().max(500),
+  activityLevel: z.enum(["sedentary", "light", "moderate", "very_active"]),
+  trainingDays: z.number().int().min(2).max(6),
+  sessionDuration: z.number().int().min(30).max(120),
+  equipment: z.string().min(1),
+  dietaryPreferences: z.string().min(1),
+  restrictions: z.string().optional(),
+});

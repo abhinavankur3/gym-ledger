@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real, index, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, index } from "drizzle-orm/sqlite-core";
 import { sql, relations } from "drizzle-orm";
 
 export const users = sqliteTable("users", {
@@ -117,6 +117,34 @@ export const userPreferences = sqliteTable("user_preferences", {
   weightUnit: text("weight_unit", { enum: ["kg", "lbs"] }).notNull().default("kg"),
   measurementUnit: text("measurement_unit", { enum: ["cm", "in"] }).notNull().default("cm"),
   theme: text("theme", { enum: ["light", "dark", "system"] }).notNull().default("dark"),
+});
+
+export const userProfiles = sqliteTable("user_profiles", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  goal: text("goal", { enum: ["lose_fat", "build_muscle", "recomposition", "general_fitness"] }).notNull(),
+  experience: text("experience", { enum: ["beginner", "intermediate", "advanced"] }).notNull(),
+  age: integer("age").notNull(),
+  sex: text("sex").notNull(),
+  height: real("height").notNull(),
+  weight: real("weight").notNull(),
+  activityLevel: text("activity_level", { enum: ["sedentary", "light", "moderate", "very_active"] }).notNull(),
+  trainingDays: integer("training_days").notNull(),
+  sessionDuration: integer("session_duration").notNull(),
+  equipment: text("equipment").notNull(),
+  dietaryPreferences: text("dietary_preferences").notNull().default("none"),
+  restrictions: text("restrictions"),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+  updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
+});
+
+export const planDrafts = sqliteTable("plan_drafts", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  planJson: text("plan_json").notNull(),
+  feedback: text("feedback"),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+  updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
 });
 
 export const routines = sqliteTable("routines", {
