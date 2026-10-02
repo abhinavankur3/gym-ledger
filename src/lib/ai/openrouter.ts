@@ -10,7 +10,19 @@ type JsonCall = {
   maxTokens: number;
   timeoutMs: number;
   temperature?: number;
+  /** Optional photo as a data URL (image/jpeg|png|webp, base64) sent alongside the JSON */
+  image?: string;
 };
+
+const MAX_IMAGE_DATA_URL = 2_000_000;
+
+/** Accepts only base64 data URLs for common image types, within the upload limit. */
+export function isSafeImageDataUrl(value: string) {
+  return (
+    value.length <= MAX_IMAGE_DATA_URL &&
+    /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(value)
+  );
+}
 
 /**
  * One structured-output call. Returns the parsed JSON, or null on any failure
@@ -24,6 +36,7 @@ export async function openRouterJson({
   maxTokens,
   timeoutMs,
   temperature = 0.4,
+  image,
 }: JsonCall): Promise<unknown | null> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
@@ -31,6 +44,16 @@ export async function openRouterJson({
     return null;
   }
   const model = process.env.OPENROUTER_GENERATION_MODEL;
+  if (image && !isSafeImageDataUrl(image)) {
+    console.warn(`[openrouter] ${name}: rejected image (unsupported type or too large)`);
+    return null;
+  }
+  const userContent = image
+    ? [
+        { type: "text", text: JSON.stringify(user) },
+        { type: "image_url", image_url: { url: image } },
+      ]
+    : JSON.stringify(user);
   const started = Date.now();
   try {
     const response = await fetch(
@@ -51,7 +74,7 @@ export async function openRouterJson({
           reasoning: { enabled: false },
           messages: [
             { role: "system", content: system },
-            { role: "user", content: JSON.stringify(user) },
+            { role: "user", content: userContent },
           ],
           response_format: {
             type: "json_schema",

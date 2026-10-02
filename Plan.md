@@ -100,7 +100,7 @@ The natural-language layer over the structured data: explain why a workout chang
 | 4 Plan review | Done |
 | 5 Routine overhaul | Done, with "Your plan" at `/app/plan` (view, change via feedback, update answers). Legacy detail/editor routes were deleted rather than kept |
 | 6 Workout logging | Done: Home starts/resumes the session directly, prefilled sets, one-tap completion, rest timer, set-level progressive overload |
-| 7 Nutrition | Targets and AI meal plans done (Phase 1); logging is Phase 2 |
+| 7 Nutrition | Targets, AI meal plans with protein-shake top-up and Jev selection, and logging (plan, photo, text) done; photo benchmark pending |
 | 8 Adaptive progression | Only per-set weight/rep suggestions |
 | 9 Queues | Deferred, as planned |
 | 10 Coach | Placeholder only |
@@ -123,10 +123,11 @@ Each phase ends with a commit.
 - AI weekly meal plan (4 distinct days rotated through the week) with draft → review → feedback → confirm; code enforces diet, avoid-list and sane numbers and scales portions to the target; offline fallback from the built-in dish set.
 - Workout plans no longer limited to the exercise library; avoided movements still removed.
 
-### Phase 2 — nutrition logging and tracking
-- Path 1: estimate intake from the meal plan — one tap "ate as planned", portion adjust, swap.
-- Path 2: food photo → Qwen 3.7 Flash identifies dishes and portions → user confirms. Benchmark on real regional meals before launch.
-- Daily intake vs targets; history.
+### Phase 2 — nutrition logging and tracking ✅
+- Path 1, from the plan: today's planned meals with one-tap "Ate it", a different amount (½, ¾, 1¼, 1½), and undo.
+- Path 2, photo or description: Qwen 3.7 Flash estimates dishes, portions and nutrition; the user adjusts amounts or removes items, then saves. Photos are resized in the browser and never stored.
+- Today's intake against targets, and a 7-day history.
+- Still to do: benchmark photo accuracy on 30–50 real regional meals (first test: a masala dosa was read as a plain dosa, so the potato filling was missed).
 
 ### Phase 3 — adaptive engine (rules, not AI)
 - Weekly review of adherence, missed sessions, lift trends, body-weight trend, meal adherence and feedback.

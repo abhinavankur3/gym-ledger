@@ -208,3 +208,30 @@ export const nutritionPlans = sqliteTable(
   },
   (table) => [index("idx_nutrition_plans_user_status").on(table.userId, table.status)]
 );
+
+/**
+ * What the user actually ate. Totals are stored so history doesn't depend on the
+ * plan still existing; items keep the per-serving numbers and servings eaten.
+ * Photos are not stored — only the estimate the user confirmed.
+ */
+export const mealLogs = sqliteTable(
+  "meal_logs",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    /** Local date YYYY-MM-DD in the user's time zone */
+    date: text("date").notNull(),
+    slot: text("slot", { enum: ["breakfast", "lunch", "snack", "dinner"] }).notNull(),
+    source: text("source", { enum: ["plan", "photo", "text"] }).notNull(),
+    title: text("title").notNull(),
+    itemsJson: text("items_json").notNull(),
+    kcal: real("kcal").notNull(),
+    protein: real("protein").notNull(),
+    carbs: real("carbs").notNull(),
+    fat: real("fat").notNull(),
+    /** Plan meals: the share of the planned portion eaten (0.5 = half) */
+    portion: real("portion"),
+    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+  },
+  (table) => [index("idx_meal_logs_user_date").on(table.userId, table.date)]
+);

@@ -3,9 +3,13 @@ import { redirect } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { ProfileButton } from "@/components/layout/page-header";
 import { SessionHero } from "@/components/session-hero";
-import { getUserTimeZone, localWeekday } from "@/lib/dates";
+import { getUserTimeZone, localHour, localWeekday } from "@/lib/dates";
+import { FactTable } from "@/components/fact-table";
+import { slotForHour } from "@/lib/nutrition/meal-log";
 import { METHOD_LABEL, type NutritionTargets } from "@/lib/nutrition/targets";
 import { getNutritionState } from "./actions";
+import { getIntake } from "./log-actions";
+import { IntakeSummary, LogOtherButton, TodayMeals, type TodayLog } from "./today-client";
 import { BuildMealPlan, ConfirmMealPlan, CuisinePicker, MealFeedback, WeekMeals } from "./meal-plan-client";
 
 const DIET_LABEL = { none: "No restrictions", vegetarian: "Vegetarian", vegan: "Vegan", eggetarian: "Eggetarian", jain: "Jain" } as const;
@@ -13,8 +17,12 @@ const DIET_LABEL = { none: "No restrictions", vegetarian: "Vegetarian", vegan: "
 export default async function NutritionPage() {
   const state = await getNutritionState();
   if (!state) redirect("/onboarding");
-  const today = localWeekday(new Date(), await getUserTimeZone());
+  const tz = await getUserTimeZone();
+  const today = localWeekday(new Date(), tz);
+  const defaultSlot = slotForHour(localHour(new Date(), tz));
+  const intake = await getIntake();
   const { targets, active, draft } = state;
+  const todayLogs: TodayLog[] = intake.today.map((l) => ({ id: l.id, slot: l.slot, source: l.source, title: l.title, portion: l.portion, kcal: l.kcal, protein: l.protein }));
 
   return (
     <main className="pb-6">
@@ -31,6 +39,21 @@ export default async function NutritionPage() {
       />
 
       <div className="mt-16 space-y-6">
+        <section aria-labelledby="today-heading" className="space-y-3">
+          <h2 id="today-heading" className="font-display text-2xl">Today</h2>
+          <div className="rounded-3xl bg-card p-5 shadow-soft dark:ring-1 dark:ring-white/5">
+            <IntakeSummary eaten={intake.totals} targets={targets} />
+          </div>
+          {active ? (
+            <TodayMeals meals={active.plan.days[today]?.meals ?? []} logs={todayLogs} defaultSlot={defaultSlot} />
+          ) : (
+            <>
+              {todayLogs.length > 0 && <p className="text-sm text-muted-foreground">{todayLogs.length} meal{todayLogs.length === 1 ? "" : "s"} logged today.</p>}
+              <LogOtherButton defaultSlot={defaultSlot} />
+            </>
+          )}
+        </section>
+
         <TargetsCard targets={targets} weightFromLog={state.weightFromLog} />
 
         {draft ? (
@@ -49,8 +72,8 @@ export default async function NutritionPage() {
         ) : active ? (
           <>
             <section aria-labelledby="week-heading">
-              <h2 id="week-heading" className="font-display text-2xl">{active.plan.name}</h2>
-              <p className="mt-1 text-sm text-muted-foreground">{active.cuisine}, {DIET_LABEL[state.diet].toLowerCase()}.</p>
+              <h2 id="week-heading" className="font-display text-2xl">Your week</h2>
+              <p className="mt-1 text-sm text-muted-foreground">{active.plan.name}: {active.cuisine}, {DIET_LABEL[state.diet].toLowerCase()}.</p>
               {targetsChanged(active.targets, targets) && (
                 <p className="mt-3 rounded-2xl bg-sun/25 px-4 py-3 text-sm">Your targets have moved since this plan was built. Build a new version below to match them.</p>
               )}
@@ -73,6 +96,25 @@ export default async function NutritionPage() {
             </p>
             {state.country?.code === "IN" && <div className="mt-4"><CuisinePicker value={state.indianRegion} /></div>}
             <div className="mt-5"><BuildMealPlan /></div>
+          </section>
+        )}
+        {intake.history.some((d) => d.meals > 0) && (
+          <section aria-labelledby="history-heading">
+            <h2 id="history-heading" className="font-display text-2xl">Last 7 days</h2>
+            <FactTable
+              className="mt-3"
+              rows={intake.history.map((d) => ({
+                key: d.date,
+                label: (
+                  <span className="block">
+                    <span className="block">{d.date === intake.date ? "Today" : new Date(`${d.date}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })}</span>
+                    <span className="block text-xs text-muted-foreground">{d.meals ? `${d.meals} meal${d.meals === 1 ? "" : "s"}, ${Math.round(d.protein)} g protein` : "Nothing logged"}</span>
+                  </span>
+                ),
+                value: d.meals ? `${Math.round((d.kcal / targets.kcal) * 100)}%` : "—",
+              }))}
+            />
+            <p className="mt-2 text-xs text-muted-foreground">Share of your daily calorie target.</p>
           </section>
         )}
       </div>

@@ -43,6 +43,13 @@
       "when": 1790967896636,
       "tag": "0005_fixed_shockwave",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1790970563242,
+      "tag": "0006_strange_wild_child",
+      "breakpoints": true
     }
   ]
 }
