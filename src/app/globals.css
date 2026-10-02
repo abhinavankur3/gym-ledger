@@ -1,29 +1,19 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/plus-jakarta-sans";
+@import "@fontsource-variable/bricolage-grotesque/standard.css";
+@import "@fontsource-variable/figtree";
 
+/* Dark styles apply under .dark — set by the theme cookie, or by the inline
+   script in the root layout when the preference is "system". */
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: "Plus Jakarta Sans Variable", system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono);
-  --font-heading: "Plus Jakarta Sans Variable", system-ui, sans-serif;
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
+  --font-sans: "Figtree Variable", "Figtree", system-ui, sans-serif;
+  --font-heading: "Bricolage Grotesque Variable", "Bricolage Grotesque", system-ui, sans-serif;
+  --font-display: "Bricolage Grotesque Variable", "Bricolage Grotesque", system-ui, sans-serif;
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -40,114 +30,111 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--card);
+  --color-sidebar-foreground: var(--foreground);
+  --color-sidebar-primary: var(--primary);
+  --color-sidebar-primary-foreground: var(--primary-foreground);
+  --color-sidebar-accent: var(--accent);
+  --color-sidebar-accent-foreground: var(--accent-foreground);
+  --color-sidebar-border: var(--border);
+  --color-sidebar-ring: var(--ring);
+
+  --color-raised: var(--raised);
+  /* Navy ink used on top of the bright session colours, in both themes */
+  --color-ink: #1b2150;
+
+  /* Session colours by movement pattern — each session type gets its own hero colour */
+  --color-push: var(--push);
+  --color-pull: var(--pull);
+  --color-legs: var(--legs);
+  --color-core: var(--core);
+  --color-sun: var(--sun);
+
+  --radius-sm: calc(var(--radius) * 0.5);
+  --radius-md: calc(var(--radius) * 0.75);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
-
-  /* Muscle group colors */
-  --color-muscle-chest: oklch(0.72 0.12 15);
-  --color-muscle-back: oklch(0.68 0.12 245);
-  --color-muscle-shoulders: oklch(0.76 0.12 80);
-  --color-muscle-biceps: oklch(0.68 0.14 285);
-  --color-muscle-triceps: oklch(0.68 0.14 285);
-  --color-muscle-legs: oklch(0.72 0.12 160);
-  --color-muscle-core: oklch(0.74 0.12 55);
-  --color-muscle-cardio: oklch(0.72 0.1 210);
-  --color-muscle-glutes: oklch(0.72 0.12 160);
-  --color-muscle-calves: oklch(0.72 0.12 160);
-  --color-muscle-forearms: oklch(0.68 0.14 285);
-  --color-muscle-full-body: oklch(0.72 0.1 210);
-
-  --animate-shimmer-slide: shimmer-slide var(--speed) ease-in-out infinite alternate;
-  --animate-spin-around: spin-around calc(var(--speed) * 2) infinite linear;
-  @keyframes shimmer-slide {
-  to {
-    transform: translate(calc(100cqw - 100%), 0);
-    }
-  }
-  @keyframes spin-around {
-  0% {
-    transform: translateZ(0) rotate(0);
-    }
-  15%, 35% {
-    transform: translateZ(0) rotate(90deg);
-    }
-  65%, 85% {
-    transform: translateZ(0) rotate(270deg);
-    }
-  100% {
-    transform: translateZ(0) rotate(360deg);
-    }
-  }
+  --radius-xl: calc(var(--radius) * 1.25);
+  --radius-2xl: calc(var(--radius) * 1.5);
+  --radius-3xl: calc(var(--radius) * 2);
+  --radius-4xl: calc(var(--radius) * 2.5);
 }
 
-/* Calm coaching workspace - deep ink with a muted botanical accent */
-:root, .dark {
-  --background: oklch(0.14 0.015 160);
-  --foreground: oklch(0.93 0.018 95);
-  --card: oklch(0.18 0.018 160);
-  --card-foreground: oklch(0.93 0.018 95);
-  --popover: oklch(0.18 0.018 160);
-  --popover-foreground: oklch(0.93 0.018 95);
-  --primary: oklch(0.72 0.12 150);
-  --primary-foreground: oklch(0.14 0.015 160);
-  --secondary: oklch(0.23 0.018 160);
-  --secondary-foreground: oklch(0.88 0.018 95);
-  --muted: oklch(0.23 0.018 160);
-  --muted-foreground: oklch(0.62 0.025 160);
-  --accent: oklch(0.72 0.12 150);
-  --accent-foreground: oklch(0.14 0.015 160);
-  --destructive: oklch(0.65 0.18 25);
-  --border: oklch(1 0 0 / 7%);
-  --input: oklch(1 0 0 / 9%);
-  --ring: oklch(0.72 0.12 150);
-  --chart-1: oklch(0.78 0.12 75);
-  --chart-2: oklch(0.72 0.12 15);
-  --chart-3: oklch(0.72 0.12 160);
-  --chart-4: oklch(0.68 0.12 245);
-  --chart-5: oklch(0.68 0.14 285);
+/* Light */
+:root {
+  --background: #f1f2f7;
+  --foreground: #1b2150;
+  --card: #ffffff;
+  --card-foreground: #1b2150;
+  --popover: #ffffff;
+  --popover-foreground: #1b2150;
+  --raised: #f7f8fb;
+  --primary: #3b4ba0;
+  --primary-foreground: #ffffff;
+  --secondary: #e7e9f2;
+  --secondary-foreground: #1b2150;
+  --muted: #e9ebf3;
+  --muted-foreground: #646b8f;
+  --accent: #e9ebf3;
+  --accent-foreground: #1b2150;
+  --destructive: #d8433a;
+  --border: rgb(27 33 80 / 9%);
+  --input: rgb(27 33 80 / 14%);
+  --ring: #3b4ba0;
+  --push: #f26b5b;
+  --pull: #5b8def;
+  --legs: #4cb782;
+  --core: #f7c03b;
+  --sun: #f7c03b;
+  --chart-1: #3b4ba0;
+  --chart-2: #f7c03b;
+  --chart-3: #4cb782;
+  --chart-4: #f26b5b;
+  --chart-5: #5b8def;
+  --shadow-color: 27 33 80;
+  --shadow-strength: 0.22;
   --radius: 0.875rem;
-  --sidebar: oklch(0.17 0.005 250);
-  --sidebar-foreground: oklch(0.93 0.01 80);
-  --sidebar-primary: oklch(0.72 0.12 150);
-  --sidebar-primary-foreground: oklch(0.16 0.005 250);
-  --sidebar-accent: oklch(0.22 0.005 250);
-  --sidebar-accent-foreground: oklch(0.93 0.01 80);
-  --sidebar-border: oklch(1 0 0 / 7%);
-  --sidebar-ring: oklch(0.78 0.12 75);
+  color-scheme: light;
 }
 
-.light {
-  --background: oklch(0.97 0.005 80);
-  --foreground: oklch(0.18 0.005 250);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.005 250);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.005 250);
-  --primary: oklch(0.65 0.14 75);
-  --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.94 0.005 80);
-  --secondary-foreground: oklch(0.18 0.005 250);
-  --muted: oklch(0.94 0.005 80);
-  --muted-foreground: oklch(0.48 0.01 250);
-  --accent: oklch(0.65 0.14 75);
-  --accent-foreground: oklch(0.98 0 0);
-  --destructive: oklch(0.55 0.18 25);
-  --border: oklch(0 0 0 / 8%);
-  --input: oklch(0 0 0 / 6%);
-  --ring: oklch(0.65 0.14 75);
-  --sidebar: oklch(0.96 0.005 80);
-  --sidebar-foreground: oklch(0.18 0.005 250);
-  --sidebar-primary: oklch(0.65 0.14 75);
-  --sidebar-primary-foreground: oklch(0.98 0 0);
-  --sidebar-accent: oklch(0.94 0.005 80);
-  --sidebar-accent-foreground: oklch(0.18 0.005 250);
-  --sidebar-border: oklch(0 0 0 / 8%);
-  --sidebar-ring: oklch(0.65 0.14 75);
+/* Dark: deep navy, cards lift with lighter navy */
+.dark {
+  --background: #10143a;
+  --foreground: #eef0fa;
+  --card: #1a1f4d;
+  --card-foreground: #eef0fa;
+  --popover: #222860;
+  --popover-foreground: #eef0fa;
+  --raised: #222860;
+  --primary: #6c7cf0;
+  --primary-foreground: #0d1130;
+  --secondary: #262c66;
+  --secondary-foreground: #eef0fa;
+  --muted: #252b62;
+  --muted-foreground: #a1a7cf;
+  --accent: #2a3170;
+  --accent-foreground: #eef0fa;
+  --destructive: #ff7b70;
+  --border: rgb(255 255 255 / 8%);
+  --input: rgb(255 255 255 / 13%);
+  --ring: #8d9af5;
+  --push: #f47e70;
+  --pull: #7aa3f4;
+  --legs: #5cc893;
+  --core: #f7c03b;
+  --sun: #f7c03b;
+  --chart-1: #8d9af5;
+  --chart-2: #f7c03b;
+  --chart-3: #5cc893;
+  --chart-4: #f47e70;
+  --chart-5: #7aa3f4;
+  --shadow-color: 0 0 0;
+  --shadow-strength: 0.5;
+  color-scheme: dark;
 }
 
 @layer base {
@@ -159,26 +146,81 @@
   }
   html {
     @apply font-sans;
+    -webkit-tap-highlight-color: transparent;
+  }
+  h1, h2, h3 {
+    font-family: var(--font-display);
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
-/* Utility classes */
 @layer utilities {
-  .text-warm {
-    color: oklch(0.72 0.12 150);
+  .font-display {
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1;
   }
-  .bg-warm {
-    background-color: oklch(0.72 0.12 150);
+  .tabular {
+    font-variant-numeric: tabular-nums;
   }
-  .bg-warm-subtle {
-    background-color: oklch(0.72 0.12 150 / 12%);
+  /* Soft, deep elevation for floating cards */
+  .shadow-soft {
+    box-shadow:
+      0 1px 2px rgb(var(--shadow-color) / calc(var(--shadow-strength) * 0.25)),
+      0 24px 48px -24px rgb(var(--shadow-color) / var(--shadow-strength));
+  }
+  .shadow-lift {
+    box-shadow:
+      0 2px 4px rgb(var(--shadow-color) / calc(var(--shadow-strength) * 0.3)),
+      0 32px 64px -28px rgb(var(--shadow-color) / calc(var(--shadow-strength) * 1.4));
+  }
+  /* Coloured glow under the primary button */
+  .shadow-glow {
+    box-shadow: 0 14px 28px -12px color-mix(in oklab, var(--primary) 75%, transparent);
   }
   .surface {
-    background: oklch(0.18 0.018 160);
-    border: 1px solid oklch(1 0 0 / 9%);
+    background: var(--card);
+    border: 1px solid var(--border);
   }
   .surface-raised {
-    background: oklch(0.22 0.018 160);
-    border: 1px solid oklch(1 0 0 / 11%);
+    background: var(--raised);
+    border: 1px solid var(--border);
   }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* The one load-time moment: the hero equipment settles into place */
+@keyframes hero-drop {
+  from {
+    transform: translateY(-14px) rotate(-6deg);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.animate-hero-drop {
+  animation: hero-drop 600ms cubic-bezier(0.2, 0.9, 0.25, 1.15) both;
 }

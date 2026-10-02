@@ -9,9 +9,9 @@ export default async function AppLayout({
   await requireUser();
 
   return (
-    <div className="min-h-screen w-full pb-24 md:pb-10 md:pl-24">
+    <div className="min-h-screen w-full pb-[calc(6.5rem+env(safe-area-inset-bottom,0px))] md:pb-12 md:pl-28">
       {/* Single content column shared by every app page */}
-      <div className="mx-auto min-h-screen w-full max-w-3xl sm:px-6 lg:px-10">
+      <div className="mx-auto min-h-screen w-full max-w-2xl px-4 sm:px-6">
         {children}
       </div>
       <BottomNav />

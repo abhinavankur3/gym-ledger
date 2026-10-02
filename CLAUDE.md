@@ -7,8 +7,8 @@ Self-hostable gym tracking web app — attendance, workouts, body metrics, chart
 - **Next.js 16** (App Router, TypeScript, `output: standalone`)
 - **Tailwind v4** + **shadcn/ui** (base-ui primitives, not Radix)
 - **SQLite** via Drizzle ORM (`@libsql/client`)
-- **Plus Jakarta Sans** font (`@fontsource-variable/plus-jakarta-sans`)
-- **Recharts** for charts, **Framer Motion** for animations
+- **Bricolage Grotesque + Figtree** fonts (`@fontsource-variable/*`)
+- **Recharts** for charts; motion is CSS-only (one load moment per screen)
 - **Docker** single-container deployment
 
 ## Commands
@@ -33,13 +33,16 @@ npm run db:seed      # Seed admin user + 80 exercises
 
 ## Design System
 
-**Soft & Premium** — warm amber/gold accent on dark charcoal. No gradients.
+Colour-blocked, layered, friendly — session colour heroes, navy ink, soft deep shadows. Tokens live in `src/app/globals.css`.
 
-- Primary accent: `oklch(0.78 0.12 75)` (warm amber)
-- Surface cards: `surface` CSS class (subtle bg + border)
-- Buttons: `bg-primary text-primary-foreground` — never use ShimmerButton
-- Font: Plus Jakarta Sans Variable
-- Max width 430px on desktop (mobile-frame)
+- **Themes:** Light (cool grey `#f1f2f7`, white cards) and Dark (deep navy `#10143a`, navy cards). Preference stored in the `theme` cookie (`src/lib/theme.ts`); "system" is resolved by an inline script in the root layout.
+- **Primary:** indigo `bg-primary` buttons with `shadow-glow`. Text on bright colour blocks uses `text-ink` (navy).
+- **Session tones:** `push` coral, `pull` sky, `legs` leaf green, `core`/`sun` yellow. Pick with `sessionTone()` / `muscleRegion()` from `src/lib/muscles.ts`; never hand-pick colours per screen.
+- **Type:** Bricolage Grotesque for headings/numbers (`font-display`), Figtree for body. Numbers use `tabular`.
+- **Elevation:** `shadow-soft` for cards, `shadow-lift` for floating chrome (nav, dialogs). Cards are `rounded-3xl`.
+- **Building blocks:** `PageHeader` (screen titles + mobile profile button), `SessionHero` (tone block + watermark + `EquipmentArt`), `FactTable` (label | value rows), `MuscleChip`, `ConfirmDialog` (never `window.confirm`).
+- **Avoid:** UI gradients, ShimmerButton/glass effects, all-caps tracked eyebrow labels, "A · B" mid-dot strings, arrows appended to button text, emoji icons, per-section fade-in animations, hard-coded Tailwind palette colours.
+- **Layout:** the app layout supplies horizontal padding and a `max-w-2xl` column; pages don't add their own. Floating tab bar on mobile (Home, Train, Nutrition, Progress, Coach; More via the profile button), floating rail on desktop.
 
 ## Auth Model
 

@@ -71,3 +71,14 @@ export function greetingForHour(hour: number) {
   if (hour < 17) return "Good afternoon";
   return "Good evening";
 }
+
+/** UTC ISO timestamp of local midnight on this week's Monday. */
+export function startOfLocalWeekIso(date: Date, timeZone: string) {
+  const weekday = localWeekday(date, timeZone);
+  return startOfLocalDayIso(new Date(date.getTime() - weekday * 24 * 60 * 60 * 1000), timeZone);
+}
+
+/** e.g. "Thursday, 2 October" in the user's zone. */
+export function formatLocalLongDate(date: Date, timeZone: string) {
+  return new Intl.DateTimeFormat("en-GB", { timeZone, weekday: "long", day: "numeric", month: "long" }).format(date);
+}

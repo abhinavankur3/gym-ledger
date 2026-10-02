@@ -6,6 +6,7 @@ import db from "@/lib/db";
 import { users, userPreferences } from "@/lib/db/schema";
 import { verifySession } from "@/lib/auth/dal";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
+import { setThemeCookie } from "@/lib/theme";
 
 export async function updatePreferences(formData: FormData) {
   const session = await verifySession();
@@ -46,8 +47,9 @@ export async function updatePreferences(formData: FormData) {
     });
   }
 
-  revalidatePath("/app/settings");
-  revalidatePath("/app");
+  if (theme === "light" || theme === "dark" || theme === "system") await setThemeCookie(theme);
+
+  revalidatePath("/", "layout");
   return { success: true };
 }
 

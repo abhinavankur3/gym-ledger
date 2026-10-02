@@ -8,6 +8,7 @@ import { users, userPreferences, userProfiles } from "@/lib/db/schema";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { createSession, deleteSession } from "@/lib/auth/session";
 import { requireAdmin, verifySession } from "@/lib/auth/dal";
+import { setThemeCookie } from "@/lib/theme";
 import { loginSchema, changePasswordSchema, createUserSchema } from "@/lib/validators/schemas";
 
 export async function login(_prev: unknown, formData: FormData) {
@@ -35,6 +36,9 @@ export async function login(_prev: unknown, formData: FormData) {
   }
 
   await createSession(user.id, user.role);
+
+  const prefs = await db.query.userPreferences.findFirst({ where: eq(userPreferences.userId, user.id) });
+  if (prefs?.theme) await setThemeCookie(prefs.theme);
 
   if (user.forcePasswordChange) {
     redirect("/change-password");

@@ -4,11 +4,11 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Gym Ledger",
     short_name: "GymLedger",
-    description: "Track your gym attendance, workouts, and body metrics",
+    description: "Your training log, plan and progress in one place",
     start_url: "/app",
     display: "standalone",
-    background_color: "#252330",
-    theme_color: "#252330",
+    background_color: "#14171c",
+    theme_color: "#14171c",
     orientation: "portrait",
     icons: [
       {

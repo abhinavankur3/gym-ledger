@@ -2,11 +2,12 @@ import type { Metadata, Viewport } from "next";
 import { Toaster } from "@/components/ui/sonner";
 import { ServiceWorkerRegister } from "@/components/shared/sw-register";
 import { TimezoneSync } from "@/components/shared/timezone-sync";
+import { getThemePreference, SYSTEM_THEME_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Gym Ledger",
-  description: "Track your gym attendance, workouts, and body metrics",
+  description: "Your training log, plan and progress in one place",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -15,26 +16,32 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#252330",
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#14171c" },
+    { media: "(prefers-color-scheme: light)", color: "#edeff2" },
+  ],
   width: "device-width",
   initialScale: 1,
-  // maximumScale keeps iOS from auto-zooming into small inputs; pinch-zoom stays available.
-  maximumScale: 1,
+  viewportFit: "cover",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const theme = await getThemePreference();
+
   return (
-    <html lang="en" className="dark h-full antialiased">
+    // The system-theme script rewrites the class before hydration
+    <html lang="en" className={`${theme === "system" ? "" : theme} h-full antialiased`} suppressHydrationWarning>
       <head>
         <link rel="apple-touch-icon" href="/icon-192x192.png" />
+        {theme === "system" && <script dangerouslySetInnerHTML={{ __html: SYSTEM_THEME_SCRIPT }} />}
       </head>
       <body className="min-h-full flex flex-col">
         {children}
-        <Toaster position="top-center" richColors />
+        <Toaster position="top-center" theme={theme} />
         <ServiceWorkerRegister />
         <TimezoneSync />
       </body>
