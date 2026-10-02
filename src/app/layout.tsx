@@ -6,12 +6,12 @@ import { getThemePreference, SYSTEM_THEME_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Gym Ledger",
+  title: "Kochi",
   description: "Your training log, plan and progress in one place",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Gym Ledger",
+    title: "Kochi",
   },
 };
 

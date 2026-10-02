@@ -1,8 +1,11 @@
-# Gym Ledger
+# Kochi
 
-A self-hostable, mobile-first web app for tracking gym attendance, workouts, body metrics, and progress over time.
+Kochi (コーチ, Japanese for "coach") is a self-hostable, mobile-first AI personal coach for training and nutrition. It builds your plan from a short onboarding, lets you log each set with one tap, and tracks your progress. See [Plan.md](Plan.md) for the roadmap.
 
 ## Features
+
+- **AI training plan** — Onboarding (goal, experience, schedule, body, equipment, diet, things to avoid) → a generated plan you review, adjust with feedback, and confirm
+- **One-tap logging** — Planned sets come prefilled with suggested weight and reps; progressive overload when you hit the top of your range; rest timer
 
 - **Gym Attendance** — Check in/out, calendar view, streak tracking
 - **Training Logs** — Log exercises, sets, reps, weight, RPE. PR detection

@@ -4,6 +4,8 @@ import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/dal";
 import { gymAttendance, workouts, bodyMetrics, planDrafts } from "@/lib/db/schema";
 import { getRoutineWeek, getTodayTemplate } from "./routines/actions";
+import { startOrResumeSession } from "./workouts/actions";
+import { SubmitButton } from "@/components/submit-button";
 import { CheckInTile } from "./attendance/check-in-tile";
 import { WeekBar } from "./week-bar";
 import { Button } from "@/components/ui/button";
@@ -33,7 +35,7 @@ export default async function AppDashboard() {
 
   const [activeCheckIn, weekWorkouts, latestWeight, todayTemplate, routineWeek, pendingPlan] = await Promise.all([
     db.query.gymAttendance.findFirst({ where: and(eq(gymAttendance.userId, user.id), gte(gymAttendance.checkIn, startOfLocalDayIso(now, tz)), sql`${gymAttendance.checkOut} IS NULL`) }),
-    db.query.workouts.findMany({ where: and(eq(workouts.userId, user.id), gte(workouts.startedAt, startOfLocalWeekIso(now, tz))), columns: { startedAt: true } }),
+    db.query.workouts.findMany({ where: and(eq(workouts.userId, user.id), gte(workouts.startedAt, startOfLocalWeekIso(now, tz))), columns: { startedAt: true, templateId: true, completedAt: true } }),
     db.query.bodyMetrics.findFirst({ where: and(eq(bodyMetrics.userId, user.id), eq(bodyMetrics.metricType, "weight")), orderBy: [desc(bodyMetrics.date)] }),
     getTodayTemplate(),
     getRoutineWeek(),
@@ -45,7 +47,8 @@ export default async function AppDashboard() {
   const nextDay = routineWeek.find((d) => d.dayOfWeek > today) ?? routineWeek[0];
   const nextInDays = nextDay ? ((nextDay.dayOfWeek - today + 7) % 7 || 7) : null;
   const trainedToday = doneDays.includes(today);
-  const workoutHref = todayTemplate ? `/app/workouts/new?templateId=${todayTemplate.id}` : "/app/workouts/new";
+  // An unfinished session of today's template started today: the button resumes it
+  const openSession = todayTemplate && weekWorkouts.some((w) => w.templateId === todayTemplate.id && !w.completedAt && localWeekday(new Date(w.startedAt), tz) === today);
   const firstName = user.name.split(" ")[0];
   const note = coachNote({ sessions: doneDays.length, planned: plannedDays.length, hasWeight: !!latestWeight, trainedToday });
   const tone = todayTemplate ? sessionTone(todayTemplate.exercises.map((e) => e.primaryMuscleGroup)) : "sun";
@@ -90,7 +93,10 @@ export default async function AppDashboard() {
         <div className="mt-16">
           {todayTemplate && (
             <>
-              <h2 className="font-display text-xl">Session plan</h2>
+              <div className="flex items-baseline justify-between">
+                <h2 className="font-display text-xl">Session plan</h2>
+                <Link href="/app/plan" className="text-sm font-semibold text-primary hover:underline">Your plan</Link>
+              </div>
               <FactTable
                 className="mt-3"
                 rows={todayTemplate.exercises.slice(0, 5).map((exercise, index) => ({
@@ -102,11 +108,17 @@ export default async function AppDashboard() {
               {todayTemplate.exercises.length > 5 && <p className="mt-2 text-sm text-muted-foreground">and {todayTemplate.exercises.length - 5} more</p>}
             </>
           )}
-          <Link href={workoutHref} className="mt-5 block">
-            <Button className="h-14 w-full rounded-2xl text-base font-semibold shadow-glow">
-              {todayTemplate ? (trainedToday ? "Log another session" : `Start ${todayTemplate.name}`) : "Log a workout"}
-            </Button>
-          </Link>
+          {todayTemplate ? (
+            <form action={startOrResumeSession.bind(null, todayTemplate.id)} className="mt-5">
+              <SubmitButton size="lg" className="w-full">
+                {openSession ? `Resume ${todayTemplate.name}` : trainedToday ? "Log another session" : `Start ${todayTemplate.name}`}
+              </SubmitButton>
+            </form>
+          ) : (
+            <Link href="/app/workouts/new" className="mt-5 block">
+              <Button size="lg" className="w-full">Log a workout</Button>
+            </Link>
+          )}
         </div>
       </section>
 
@@ -140,7 +152,7 @@ export default async function AppDashboard() {
 
       {/* Coach note */}
       <section aria-labelledby="coach-heading" className="mt-3 rounded-3xl bg-ink p-5 text-white shadow-soft dark:bg-card">
-        <h2 id="coach-heading" className="font-display text-xl">From your coach</h2>
+        <h2 id="coach-heading" className="font-display text-xl">From Kochi</h2>
         <p className="mt-2 text-[1.0625rem] leading-7 text-white/85">{note.text}</p>
         <Link href={note.href} className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-sun hover:underline">
           {note.cta} <ChevronRight className="h-4 w-4" />

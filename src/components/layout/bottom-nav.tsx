@@ -15,7 +15,7 @@ import {
 
 const navItems = [
   { href: "/app", label: "Home", icon: Home, match: ["/app"] },
-  { href: "/app/workouts", label: "Train", icon: Dumbbell, match: ["/app/workouts"] },
+  { href: "/app/workouts", label: "Train", icon: Dumbbell, match: ["/app/workouts", "/app/plan"] },
   { href: "/app/nutrition", label: "Nutrition", icon: Salad, match: ["/app/nutrition"] },
   { href: "/app/progress", label: "Progress", icon: BarChart3, match: ["/app/progress", "/app/charts", "/app/metrics", "/app/attendance"] },
   { href: "/app/coach", label: "Coach", icon: MessageCircle, match: ["/app/coach"] },
@@ -32,7 +32,7 @@ export function BottomNav() {
       aria-label="Main"
       className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom,0px))] z-50 rounded-[1.75rem] border border-border bg-card/95 shadow-lift backdrop-blur-xl md:inset-x-auto md:bottom-4 md:left-4 md:top-4 md:w-20"
     >
-      <Link href="/app" aria-label="Gym Ledger home" className="hidden md:mx-auto md:mt-5 md:flex md:justify-center">
+      <Link href="/app" aria-label="Kochi home" className="hidden md:mx-auto md:mt-5 md:flex md:justify-center">
         <BrandMark className="h-10 w-10" />
       </Link>
       <div className="flex h-16 items-center justify-around px-1 md:absolute md:inset-x-0 md:top-1/2 md:h-auto md:-translate-y-1/2 md:flex-col md:gap-3">

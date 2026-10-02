@@ -164,7 +164,7 @@ export function SettingsForm({ initialName, initialWeightUnit, initialMeasuremen
           </Button>
         </form>
 
-        <p className="pt-2 text-center text-xs text-muted-foreground">Gym Ledger v0.1.0</p>
+        <p className="pt-2 text-center text-xs text-muted-foreground">Kochi v0.1.0</p>
       </div>
     </div>
   );

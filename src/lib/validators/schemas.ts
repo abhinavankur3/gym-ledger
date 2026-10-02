@@ -46,5 +46,6 @@ export const onboardingSchema = z.object({
   sessionDuration: z.number().int().min(30).max(120),
   equipment: z.string().min(1),
   dietaryPreferences: z.string().min(1),
-  restrictions: z.string().optional(),
+  restrictions: z.string().max(300).optional(),
+  avoidMovements: z.string().max(300).optional(),
 });

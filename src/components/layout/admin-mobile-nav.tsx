@@ -20,7 +20,7 @@ export function AdminMobileNav() {
         <div className="flex items-center gap-3">
           <BrandMark className="h-9 w-9" />
           <div>
-            <p className="font-display text-base leading-tight">Gym Ledger</p>
+            <p className="font-display text-base leading-tight">Kochi</p>
             <p className="text-xs text-muted-foreground">Admin</p>
           </div>
         </div>

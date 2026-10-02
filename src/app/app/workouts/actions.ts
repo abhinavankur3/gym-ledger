@@ -2,6 +2,8 @@
 
 import { eq, and, desc, asc, sql, inArray, lt, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { isNull } from "drizzle-orm";
 import db from "@/lib/db";
 import {
   workouts,
@@ -302,4 +304,38 @@ export async function getLastPerformance(exerciseIds: number[], currentWorkoutId
     (byExercise[row.exerciseId] ??= []).push(row);
   }
   return byExercise;
+}
+
+/**
+ * One-tap start from Home: opens an unfinished session of this template from the
+ * last 12 hours if there is one, otherwise creates it, then goes straight to logging.
+ */
+export async function startOrResumeSession(templateId: number) {
+  const session = await verifySession();
+
+  const template = await db.query.workoutTemplates.findFirst({
+    where: and(eq(workoutTemplates.id, templateId), eq(workoutTemplates.userId, session.userId)),
+    columns: { id: true, name: true },
+  });
+  if (!template) redirect("/app/workouts/new");
+
+  const since = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
+  const open = await db.query.workouts.findFirst({
+    where: and(
+      eq(workouts.userId, session.userId),
+      eq(workouts.templateId, template.id),
+      isNull(workouts.completedAt),
+      sql`${workouts.startedAt} >= ${since}`
+    ),
+    orderBy: [desc(workouts.startedAt)],
+    columns: { id: true },
+  });
+
+  const workoutId =
+    open?.id ??
+    (await db.insert(workouts).values({ userId: session.userId, name: template.name, templateId: template.id, startedAt: new Date().toISOString() }).returning({ id: workouts.id }))[0].id;
+
+  revalidatePath("/app");
+  revalidatePath("/app/workouts");
+  redirect(`/app/workouts/${workoutId}`);
 }

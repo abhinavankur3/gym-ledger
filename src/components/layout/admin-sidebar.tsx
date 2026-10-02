@@ -24,7 +24,7 @@ export function AdminSidebar() {
       <div className="mb-8 flex items-center gap-3 px-2 pt-1">
         <BrandMark className="h-10 w-10" />
         <div>
-          <p className="font-display text-lg leading-tight">Gym Ledger</p>
+          <p className="font-display text-lg leading-tight">Kochi</p>
           <p className="text-xs text-muted-foreground">Admin</p>
         </div>
       </div>

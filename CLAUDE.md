@@ -1,6 +1,6 @@
-# Gym Ledger
+# Kochi
 
-Self-hostable gym tracking web app — attendance, workouts, body metrics, charts.
+Kochi (コーチ, "coach") — a self-hostable AI personal coach for training and nutrition. See [Plan.md](Plan.md) for the product plan.
 
 ## Tech Stack
 

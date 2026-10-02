@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useCallback, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { addSet, deleteSet, removeExerciseFromWorkout, completeWorkout, getLastPerformance } from "../actions";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Plus, Minus, Trophy, Check, X, ChevronLeft, Loader2, Undo2 } from "luci
 import Link from "next/link";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { RestTimer, restDeadline } from "./rest-timer";
 import { SessionHero } from "@/components/session-hero";
 import { MuscleChip } from "@/components/muscle-chip";
 import { sessionTone } from "@/lib/muscles";
@@ -123,6 +124,8 @@ export function ActiveWorkout({
   const [pendingKeys, setPendingKeys] = useState<string[]>([]);
   // Planned exercises the user removed from this session
   const [hiddenIds, setHiddenIds] = useState<number[]>([]);
+  const [restEndsAt, setRestEndsAt] = useState<number | null>(null);
+  const changeRest = useCallback((endsAt: number | null) => setRestEndsAt(endsAt), []);
   const isCompleted = !!workout.completedAt;
 
   const loggedExerciseIds = Object.keys(setsByExercise).map(Number);
@@ -183,6 +186,7 @@ export function ActiveWorkout({
     setPendingKeys((keys) => [...keys, key]);
     setLocalDone((prev) => ({ ...prev, [exerciseId]: [...(prev[exerciseId] ?? []), optimistic] }));
     navigator.vibrate?.(12);
+    setRestEndsAt(restDeadline());
 
     startTransition(async () => {
       const result = await addSet(workout.id, exerciseId, {
@@ -399,6 +403,7 @@ export function ActiveWorkout({
         </div>
       )}
 
+      {!isCompleted && <RestTimer endsAt={restEndsAt} onChange={changeRest} />}
       <ExercisePicker open={pickerOpen} onOpenChange={setPickerOpen} onSelect={handlePickExercise} exercises={allExercises} />
       <ConfirmDialog
         open={removeExerciseId !== null}

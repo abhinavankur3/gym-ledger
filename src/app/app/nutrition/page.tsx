@@ -9,11 +9,11 @@ export default function NutritionPage() {
       <div className="flex justify-end pt-6 md:pt-10"><ProfileButton /></div>
       <SessionHero tone="legs" kicker="Nutrition" title="Fuel the plan" watermark="Fuel" art="bowl" asHeading className="mt-3" />
       <PlannedFeatures
-        intro="Nutrition is being built into your coach so meals and training share one plan."
+        intro="Nutrition is being built into Kochi so meals and training share one plan."
         features={[
           { icon: Target, title: "Daily targets", detail: "Calories and protein worked out from your goal, body and training days." },
           { icon: CalendarDays, title: "A meal plan that fits", detail: "Suggestions that respect your diet and anything you avoid." },
-          { icon: Camera, title: "Effortless logging", detail: "Describe a meal in a few words and your coach fills in the rest." },
+          { icon: Camera, title: "Effortless logging", detail: "Describe a meal in a few words and Kochi fills in the rest." },
         ]}
       />
     </main>

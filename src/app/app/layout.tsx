@@ -1,3 +1,7 @@
+import { eq } from "drizzle-orm";
+import { redirect } from "next/navigation";
+import db from "@/lib/db";
+import { userProfiles } from "@/lib/db/schema";
 import { requireUser } from "@/lib/auth/dal";
 import { BottomNav } from "@/components/layout/bottom-nav";
 
@@ -6,7 +10,13 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  await requireUser();
+  const user = await requireUser();
+
+  // Members can't use the app without the profile their plan is built from.
+  if (user.role === "user") {
+    const profile = await db.query.userProfiles.findFirst({ where: eq(userProfiles.userId, user.id), columns: { id: true } });
+    if (!profile) redirect("/onboarding");
+  }
 
   return (
     <div className="min-h-screen w-full pb-[calc(6.5rem+env(safe-area-inset-bottom,0px))] md:pb-12 md:pl-28">

@@ -133,7 +133,10 @@ export const userProfiles = sqliteTable("user_profiles", {
   sessionDuration: integer("session_duration").notNull(),
   equipment: text("equipment").notNull(),
   dietaryPreferences: text("dietary_preferences").notNull().default("none"),
+  /** Foods to avoid (allergies, dislikes). Untrusted free text. */
   restrictions: text("restrictions"),
+  /** Movements, injuries or constraints to avoid in training. Untrusted free text. */
+  avoidMovements: text("avoid_movements"),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
 });

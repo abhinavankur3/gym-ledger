@@ -4,23 +4,13 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { FactTable } from "@/components/fact-table";
 import { cn } from "@/lib/utils";
-import { TONE_BG, type SessionTone } from "@/lib/muscles";
 import { regeneratePlan, confirmPlan } from "./actions";
+import { PlanDayCard, dayTone } from "./plan-day-card";
 import { WEEKDAY_LABELS, trainingWeekdays, type Plan } from "@/lib/ai/plan-types";
 
 const FEEDBACK_LIMIT = 600;
 const WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-
-/** Plan days only carry exercise names, so the session colour comes from the day's name. */
-function dayTone(name: string): SessionTone {
-  const n = name.toLowerCase();
-  if (/push|upper|chest|shoulder/.test(n)) return "push";
-  if (/pull|back/.test(n)) return "pull";
-  if (/lower|leg|squat|glute/.test(n)) return "legs";
-  return "sun";
-}
 
 export function PlanReview({ plan, feedback: initialFeedback }: { plan: Plan; feedback: string }) {
   const [feedback, setFeedback] = useState(initialFeedback);
@@ -62,23 +52,17 @@ export function PlanReview({ plan, feedback: initialFeedback }: { plan: Plan; fe
         {plan.days.map((day, index) => {
           const tone = dayTone(day.name);
           return (
-            <article key={`${day.name}-${index}`} className="overflow-hidden rounded-3xl bg-card shadow-soft dark:ring-1 dark:ring-white/5">
-              <div className={cn("relative h-32 overflow-hidden p-5 text-ink", TONE_BG[tone])}>
-                <span aria-hidden className="pointer-events-none absolute -left-1 top-8 select-none whitespace-nowrap font-display text-[5.5rem] leading-none text-white/25">{day.name}</span>
-                <p className="relative text-sm font-semibold text-ink/70">{WEEKDAY_NAMES[weekdays[index]]}</p>
-                <h2 className="relative mt-6 font-display text-3xl">{day.name}<span className="text-white">.</span></h2>
-              </div>
-              <div className="p-3">
-                <FactTable
-                  className="border-0"
-                  rows={day.exercises.map((exercise, exerciseIndex) => ({
-                    key: `${exercise.exercise}-${exerciseIndex}`,
-                    label: exercise.exercise,
-                    value: `${exercise.sets} × ${exercise.reps}`,
-                  }))}
-                />
-              </div>
-            </article>
+            <PlanDayCard
+              key={`${day.name}-${index}`}
+              weekday={WEEKDAY_NAMES[weekdays[index]]}
+              name={day.name}
+              tone={tone}
+              rows={day.exercises.map((exercise, exerciseIndex) => ({
+                key: `${exercise.exercise}-${exerciseIndex}`,
+                label: exercise.exercise,
+                value: `${exercise.sets} × ${exercise.reps}`,
+              }))}
+            />
           );
         })}
       </div>

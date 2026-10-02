@@ -23,7 +23,7 @@ export default function LoginPage() {
         <EquipmentArt kind="kettlebell" className="animate-hero-drop absolute right-2 top-16 z-10 w-32" />
 
         <form action={action} className="relative rounded-b-[2rem] bg-card p-6 pt-7 shadow-lift dark:ring-1 dark:ring-white/5">
-          <h1 className="font-display text-[2.5rem]">Gym Ledger<span className="text-primary">.</span></h1>
+          <h1 className="font-display text-[2.5rem]">Kochi<span className="text-primary">.</span></h1>
           <p className="mt-2 text-muted-foreground">Your personal coach for training and nutrition. Sign in to pick up where you left off.</p>
 
           {state?.error && (

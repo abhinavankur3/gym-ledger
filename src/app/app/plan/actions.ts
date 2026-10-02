@@ -1,10 +1,10 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import db from "@/lib/db";
-import { planDrafts, userProfiles } from "@/lib/db/schema";
+import { planDrafts, routines, userProfiles, workoutTemplateExercises } from "@/lib/db/schema";
 import { verifySession } from "@/lib/auth/dal";
 import { generatePlan, normalizePlanFeedback, persistPlan } from "@/lib/ai/plan-generator";
 import type { Plan } from "@/lib/ai/plan-types";
@@ -26,6 +26,42 @@ export async function getPlanDraft() {
   } catch {
     return null;
   }
+}
+
+/** The confirmed, active plan: each training day with its exercises and targets. */
+export async function getActivePlan() {
+  const session = await verifySession();
+  const routine = await db.query.routines.findFirst({
+    where: and(eq(routines.userId, session.userId), eq(routines.isActive, true)),
+    with: {
+      days: {
+        with: {
+          template: {
+            with: { exercises: { with: { exercise: true }, orderBy: [asc(workoutTemplateExercises.orderIndex)] } },
+          },
+        },
+      },
+    },
+  });
+  if (!routine) return null;
+
+  return {
+    name: routine.name,
+    createdAt: routine.createdAt,
+    days: routine.days
+      .sort((a, b) => a.dayOfWeek - b.dayOfWeek)
+      .map((day) => ({
+        dayOfWeek: day.dayOfWeek,
+        templateId: day.template.id,
+        name: day.template.name,
+        exercises: day.template.exercises.map((te) => ({
+          name: te.exercise.name,
+          muscle: te.exercise.primaryMuscleGroup,
+          sets: te.targetSets,
+          reps: te.targetReps,
+        })),
+      })),
+  };
 }
 
 export async function regeneratePlan(formData: FormData) {

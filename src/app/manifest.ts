@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Gym Ledger",
-    short_name: "GymLedger",
+    name: "Kochi",
+    short_name: "Kochi",
     description: "Your training log, plan and progress in one place",
     start_url: "/app",
     display: "standalone",

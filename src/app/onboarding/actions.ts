@@ -6,6 +6,7 @@ import { planDrafts, userProfiles } from "@/lib/db/schema";
 import { verifySession } from "@/lib/auth/dal";
 import { onboardingSchema } from "@/lib/validators/schemas";
 import { generatePlan } from "@/lib/ai/plan-generator";
+import { AVOID_MAX, sanitizeUserText } from "@/lib/ai/user-text";
 
 export async function completeOnboarding(_prev: { error?: string } | null, formData: FormData): Promise<{ error?: string } | null> {
   const session = await verifySession();
@@ -21,7 +22,8 @@ export async function completeOnboarding(_prev: { error?: string } | null, formD
     sessionDuration: Number(formData.get("sessionDuration")),
     equipment: formData.get("equipment"),
     dietaryPreferences: formData.get("dietaryPreferences"),
-    restrictions: String(formData.get("restrictions") ?? "").trim() || undefined,
+    restrictions: sanitizeUserText(String(formData.get("restrictions") ?? ""), AVOID_MAX) || undefined,
+    avoidMovements: sanitizeUserText(String(formData.get("avoidMovements") ?? ""), AVOID_MAX) || undefined,
   };
 
   const parsed = onboardingSchema.safeParse(raw);
