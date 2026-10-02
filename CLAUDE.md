@@ -35,7 +35,7 @@ npm run db:seed      # Seed admin user + 80 exercises
 
 Colour-blocked, layered, friendly — session colour heroes, navy ink, soft deep shadows. Tokens live in `src/app/globals.css`.
 
-- **Themes:** Light (cool grey `#f1f2f7`, white cards) and Dark (deep navy `#10143a`, navy cards). Preference stored in the `theme` cookie (`src/lib/theme.ts`); "system" is resolved by an inline script in the root layout.
+- **Themes:** Light (warm oat-sand `#ebe5d1`, cream cards `#fffcf5`, earthy neutrals) and Dark (deep navy `#10143a`, navy cards). Preference stored in the `theme` cookie (`src/lib/theme.ts`); "system" is resolved by an inline script in the root layout.
 - **Primary:** indigo `bg-primary` buttons with `shadow-glow`. Text on bright colour blocks uses `text-ink` (navy).
 - **Session tones:** `push` coral, `pull` sky, `legs` leaf green, `core`/`sun` yellow. Pick with `sessionTone()` / `muscleRegion()` from `src/lib/muscles.ts`; never hand-pick colours per screen.
 - **Type:** Bricolage Grotesque for headings/numbers (`font-display`), Figtree for body. Numbers use `tabular`.
