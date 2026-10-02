@@ -1,51 +1,58 @@
 import { requireUser } from "@/lib/auth/dal";
 import { getWorkoutHistory } from "./actions";
-import { BlurFade } from "@/components/ui/blur-fade";
 import { WorkoutCard } from "./workout-card";
 import Link from "next/link";
-import { Plus, Dumbbell } from "lucide-react";
+import { Plus } from "lucide-react";
+import { PageHeader } from "@/components/layout/page-header";
+import { EquipmentArt } from "@/components/equipment-art";
 
 export default async function WorkoutsPage() {
   await requireUser();
   const workouts = await getWorkoutHistory();
 
   return (
-    <main className="px-4 pt-8">
-      <BlurFade delay={0}>
-        <div className="flex items-center justify-between">
-          <div><p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Training log</p><h1 className="mt-1 text-3xl font-bold tracking-tight">Workouts</h1></div>
+    <main className="pb-6">
+      <PageHeader
+        title="Training log"
+        subtitle={workouts.length > 0 ? `${workouts.length} session${workouts.length === 1 ? "" : "s"} logged` : undefined}
+        action={
           <Link
             href="/app/workouts/new"
             aria-label="Start a new workout"
-            className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm"
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-glow"
           >
             <Plus className="h-5 w-5" />
           </Link>
+        }
+      />
+
+      {workouts.length > 0 ? (
+        <div className="space-y-3">
+          {workouts.map((workout) => (
+            <WorkoutCard key={workout.id} workout={workout} />
+          ))}
         </div>
-      </BlurFade>
-
-      <div className="mt-8 space-y-3">
-        {workouts.map((workout, i) => (
-          <BlurFade key={workout.id} delay={0.05 * (i + 1)}>
-            <WorkoutCard workout={workout} />
-          </BlurFade>
-        ))}
-
-        {workouts.length === 0 && (
-          <BlurFade delay={0.1}>
-            <div className="rounded-3xl border border-dashed border-border px-6 py-16 text-center">
-              <Dumbbell className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
-              <p className="text-muted-foreground">No workouts yet</p>
-              <Link
-                href="/app/workouts/new"
-                className="mt-4 inline-flex items-center gap-2 bg-primary text-primary-foreground rounded-xl px-4 py-2 text-sm font-medium"
-              >
-                <Plus className="h-4 w-4" /> Start Your First Workout
-              </Link>
-            </div>
-          </BlurFade>
-        )}
-      </div>
+      ) : (
+        <div className="relative mt-2 overflow-hidden rounded-[2rem] bg-sun p-6 pb-8 text-ink">
+          <span aria-hidden className="pointer-events-none absolute -left-2 top-6 select-none whitespace-nowrap font-display text-[7rem] leading-none text-white/25">
+            Start
+          </span>
+          <div className="relative">
+            <p className="text-sm font-semibold text-ink/70">Nothing logged yet</p>
+            <p className="mt-14 max-w-[14rem] font-display text-[2.2rem] leading-[0.95]">
+              Your first session<span className="text-white">.</span>
+            </p>
+            <p className="mt-3 max-w-[15rem] text-sm text-ink/75">Log the sets you do today and they’ll show up here with volume and PRs.</p>
+            <Link
+              href="/app/workouts/new"
+              className="mt-6 inline-flex h-12 items-center gap-2 rounded-2xl bg-ink px-5 text-sm font-semibold text-white"
+            >
+              <Plus className="h-4 w-4" /> Start a workout
+            </Link>
+          </div>
+          <EquipmentArt kind="kettlebell" className="absolute -right-4 bottom-2 w-32 opacity-95" />
+        </div>
+      )}
     </main>
   );
 }

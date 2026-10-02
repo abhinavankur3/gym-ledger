@@ -30,14 +30,16 @@ export function AttendanceCalendar({ year, month, attendedDays, activeCheckIn, t
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
 
   return (
-    <div className="surface rounded-2xl p-4 border border-white/10">
-      <p className="text-center font-semibold mb-3">
-        {MONTH_NAMES[month - 1]} {year}
-      </p>
-      <div className="grid grid-cols-7 gap-1 text-center">
+    <section aria-label={`${MONTH_NAMES[month - 1]} ${year}`} className="rounded-3xl bg-card p-5 shadow-soft dark:ring-1 dark:ring-white/5">
+      <div className="flex items-baseline justify-between">
+        <h2 className="font-display text-xl">{MONTH_NAMES[month - 1]}</h2>
+        <span className="text-sm text-muted-foreground">{year}</span>
+      </div>
+      <div className="mt-4 grid grid-cols-7 gap-1 text-center">
         {DAY_NAMES.map((d) => (
-          <div key={d} className="text-[10px] text-muted-foreground font-medium py-1">
-            {d}
+          <div key={d} className="py-1 text-xs font-medium text-muted-foreground">
+            {d.slice(0, 1)}
+            <span className="sr-only">{d.slice(1)}</span>
           </div>
         ))}
         {cells.map((day, i) => {
@@ -50,22 +52,21 @@ export function AttendanceCalendar({ year, month, attendedDays, activeCheckIn, t
           return (
             <div
               key={day}
+              aria-label={`${MONTH_NAMES[month - 1]} ${day}${isAttended ? ", checked in" : ""}${isToday ? ", today" : ""}`}
               className={cn(
-                "relative flex h-9 w-9 items-center justify-center rounded-xl text-sm mx-auto transition-colors",
-                isAttended && !isTodayActive && "bg-primary/20 text-primary font-semibold",
-                isTodayActive && "bg-primary text-primary-foreground font-semibold",
-                isToday && !isAttended && "ring-1 ring-primary/50",
-                !isAttended && !isToday && "text-muted-foreground"
+                "tabular mx-auto flex h-10 w-10 items-center justify-center rounded-2xl text-sm transition-colors",
+                isAttended && "bg-legs font-semibold text-ink",
+                isTodayActive && "shadow-soft",
+                isToday && "ring-2 ring-primary ring-offset-2 ring-offset-card",
+                !isAttended && !isToday && "text-muted-foreground",
+                !isAttended && isToday && "font-semibold text-foreground"
               )}
             >
               {day}
-              {isAttended && !isTodayActive && (
-                <span className="absolute bottom-0.5 h-1 w-1 rounded-full bg-primary" />
-              )}
             </div>
           );
         })}
       </div>
-    </div>
+    </section>
   );
 }

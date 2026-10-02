@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Search, Plus } from "lucide-react";
 import {
@@ -21,23 +20,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { MuscleChip } from "@/components/muscle-chip";
+import { REGION_DOT, muscleLabel, muscleRegion } from "@/lib/muscles";
 import { createCustomExercise } from "./actions";
 import { toast } from "sonner";
-
-const MUSCLE_GROUP_COLORS: Record<string, string> = {
-  chest: "bg-rose-500/20 text-rose-400 border-rose-500/30",
-  back: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  shoulders: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-  biceps: "bg-violet-500/20 text-violet-400 border-violet-500/30",
-  triceps: "bg-violet-500/20 text-violet-400 border-violet-500/30",
-  quads: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-  hamstrings: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-  glutes: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-  calves: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-  core: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-  forearms: "bg-violet-500/20 text-violet-400 border-violet-500/30",
-  full_body: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
-};
 
 const CATEGORIES = [
   "all",
@@ -63,6 +49,8 @@ type Exercise = {
   secondaryMuscleGroups: string | null;
   isCustom: boolean;
 };
+
+const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 
 export function ExerciseList({ exercises }: { exercises: Exercise[] }) {
   const [search, setSearch] = useState("");
@@ -93,161 +81,127 @@ export function ExerciseList({ exercises }: { exercises: Exercise[] }) {
     if (result?.error) {
       toast.error(result.error);
     } else {
-      toast.success("Exercise created!");
+      toast.success("Exercise added");
       setSheetOpen(false);
     }
   }
 
   return (
-    <div className="mt-4 space-y-4">
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search exercises..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-10 h-11 rounded-xl bg-white/5 border-white/10"
-        />
+    <div className="space-y-5">
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="search"
+            aria-label="Search exercises"
+            placeholder="Search exercises"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-11 shadow-soft"
+          />
+        </div>
+
+        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+          <SheetTrigger render={<Button size="icon-lg" aria-label="Add a custom exercise" />}>
+            <Plus className="h-5 w-5" />
+          </SheetTrigger>
+          <SheetContent side="bottom" className="mx-auto max-w-2xl rounded-t-[2rem] border-border pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-lift">
+            <SheetHeader className="px-6 pt-6">
+              <SheetTitle className="font-display text-2xl">Add an exercise</SheetTitle>
+            </SheetHeader>
+            <form action={handleCreateExercise} className="space-y-4 px-6">
+              <div className="space-y-2">
+                <Label htmlFor="exercise-name">Name</Label>
+                <Input id="exercise-name" name="name" required placeholder="e.g. Landmine Press" />
+              </div>
+              <div className="space-y-2">
+                <Label>Equipment</Label>
+                <Select name="category" required>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Choose equipment" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIES.filter((c) => c !== "all").map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {capitalize(cat)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Main muscle group</Label>
+                <Select name="primaryMuscleGroup" required>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Choose a muscle group" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MUSCLE_GROUPS.map((mg) => (
+                      <SelectItem key={mg} value={mg}>
+                        {muscleLabel(mg)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button type="submit" size="lg" className="w-full">
+                Add exercise
+              </Button>
+            </form>
+          </SheetContent>
+        </Sheet>
       </div>
 
-      {/* Category Filter */}
-      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+      <div role="radiogroup" aria-label="Filter by equipment" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 no-scrollbar sm:-mx-6 sm:px-6">
         {CATEGORIES.map((cat) => (
           <button
+            type="button"
+            role="radio"
+            aria-checked={category === cat}
             key={cat}
             onClick={() => setCategory(cat)}
             className={cn(
-              "shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors border",
+              "h-10 shrink-0 rounded-full px-4 text-sm font-semibold transition-colors",
               category === cat
-                ? "bg-primary text-primary-foreground border-transparent"
-                : "border-white/10 text-muted-foreground hover:text-foreground"
+                ? "bg-primary text-primary-foreground shadow-glow"
+                : "bg-card text-muted-foreground shadow-soft hover:text-foreground"
             )}
           >
-            {cat === "all" ? "All" : cat.charAt(0).toUpperCase() + cat.slice(1)}
+            {cat === "all" ? "All" : capitalize(cat)}
           </button>
         ))}
       </div>
 
-      {/* Exercise Groups */}
       {grouped.map(([group, items]) => (
-        <div key={group}>
-          <div className="flex items-center gap-2 mb-2">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              {group.replace("_", " ")}
-            </h2>
-            <Badge
-              variant="outline"
-              className={cn("text-[10px]", MUSCLE_GROUP_COLORS[group])}
-            >
-              {items.length}
-            </Badge>
-          </div>
-          <div className="space-y-1">
+        <section key={group} aria-labelledby={`group-${group}`}>
+          <h2 id={`group-${group}`} className="mb-3 flex items-center gap-2 font-display text-lg">
+            <span aria-hidden className={cn("h-2.5 w-2.5 rounded-full", REGION_DOT[muscleRegion(group)])} />
+            {muscleLabel(group)}
+            <span className="tabular text-sm font-normal text-muted-foreground">{items.length}</span>
+          </h2>
+          <ul className="divide-y divide-border overflow-hidden rounded-3xl bg-card shadow-soft dark:ring-1 dark:ring-white/5">
             {items.map((exercise) => (
-              <div
-                key={exercise.id}
-                className="flex items-center justify-between rounded-xl p-3 hover:bg-white/5 transition-colors"
-              >
-                <div>
-                  <p className="text-sm font-medium">{exercise.name}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[10px] text-muted-foreground">
-                      {exercise.category}
-                    </span>
-                    {exercise.isCustom && (
-                      <Badge
-                        variant="outline"
-                        className="text-[9px] border-primary/30 text-primary"
-                      >
-                        Custom
-                      </Badge>
-                    )}
-                  </div>
+              <li key={exercise.id} className="flex items-center justify-between gap-3 px-4 py-3.5">
+                <div className="min-w-0">
+                  <p className="truncate font-semibold">{exercise.name}</p>
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    {capitalize(exercise.category)}
+                    {exercise.isCustom && <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">Custom</span>}
+                  </p>
                 </div>
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    "text-[10px] shrink-0",
-                    MUSCLE_GROUP_COLORS[exercise.primaryMuscleGroup]
-                  )}
-                >
-                  {exercise.primaryMuscleGroup.replace("_", " ")}
-                </Badge>
-              </div>
+                <MuscleChip muscle={exercise.primaryMuscleGroup} className="shrink-0" />
+              </li>
             ))}
-          </div>
-        </div>
+          </ul>
+        </section>
       ))}
 
       {filtered.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground">
-          <p>No exercises found</p>
+        <div className="rounded-3xl bg-card px-6 py-12 text-center shadow-soft">
+          <p className="font-display text-xl">No exercises match</p>
+          <p className="mt-2 text-sm text-muted-foreground">Try another search or equipment filter, or add it as a custom exercise.</p>
         </div>
       )}
-
-      {/* Create Custom Exercise FAB */}
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetTrigger
-          render={
-            <button className="fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary shadow-lg shadow-primary/30" />
-          }
-        >
-          <Plus className="h-6 w-6 text-primary-foreground" />
-        </SheetTrigger>
-        <SheetContent side="bottom" className="surface border-white/10 rounded-t-2xl">
-          <SheetHeader>
-            <SheetTitle>Create Custom Exercise</SheetTitle>
-          </SheetHeader>
-          <form action={handleCreateExercise} className="space-y-4 mt-4">
-            <div className="space-y-2">
-              <Label>Exercise Name</Label>
-              <Input
-                name="name"
-                required
-                className="h-11 rounded-xl bg-white/5 border-white/10"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Category</Label>
-              <Select name="category" required>
-                <SelectTrigger className="h-11 rounded-xl bg-white/5 border-white/10">
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {CATEGORIES.filter((c) => c !== "all").map((cat) => (
-                    <SelectItem key={cat} value={cat}>
-                      {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Primary Muscle Group</Label>
-              <Select name="primaryMuscleGroup" required>
-                <SelectTrigger className="h-11 rounded-xl bg-white/5 border-white/10">
-                  <SelectValue placeholder="Select muscle group" />
-                </SelectTrigger>
-                <SelectContent>
-                  {MUSCLE_GROUPS.map((mg) => (
-                    <SelectItem key={mg} value={mg}>
-                      {mg.replace("_", " ").charAt(0).toUpperCase() +
-                        mg.replace("_", " ").slice(1)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button
-              type="submit"
-              className="w-full bg-primary text-primary-foreground rounded-xl"
-            >
-              Create Exercise
-            </Button>
-          </form>
-        </SheetContent>
-      </Sheet>
     </div>
   );
 }

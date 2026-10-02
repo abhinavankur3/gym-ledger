@@ -243,21 +243,17 @@ export async function removeTemplateFromDay(
   return { success: true };
 }
 
-/** The next scheduled training day after today in the active routine, for rest-day messaging. */
-export async function getNextTrainingDay() {
+/** The active routine's training days (0 = Monday), for the weekly bar and rest-day messaging. */
+export async function getRoutineWeek() {
   const session = await verifySession();
 
   const activeRoutine = await db.query.routines.findFirst({
     where: and(eq(routines.userId, session.userId), eq(routines.isActive, true)),
     with: { days: { with: { template: { columns: { name: true } } } } },
   });
-  if (!activeRoutine || activeRoutine.days.length === 0) return null;
+  if (!activeRoutine) return [];
 
-  const today = localWeekday(new Date(), await getUserTimeZone());
-  for (let offset = 1; offset <= 7; offset++) {
-    const dayOfWeek = (today + offset) % 7;
-    const day = activeRoutine.days.find((d) => d.dayOfWeek === dayOfWeek);
-    if (day) return { name: day.template.name, dayOfWeek, inDays: offset };
-  }
-  return null;
+  return activeRoutine.days
+    .map((d) => ({ dayOfWeek: d.dayOfWeek, name: d.template.name }))
+    .sort((a, b) => a.dayOfWeek - b.dayOfWeek);
 }

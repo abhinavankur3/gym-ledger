@@ -3,7 +3,6 @@
 import { useState, useTransition, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { addMetric, deleteMetric } from "./actions";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -81,7 +80,7 @@ export function MetricsClient({
       if (result?.error) {
         toast.error(result.error);
       } else {
-        toast.success("Metric logged!");
+        toast.success("Reading logged");
         setValue("");
         router.refresh();
       }
@@ -104,148 +103,143 @@ export function MetricsClient({
 
   const trend = getTrend(filteredMetrics);
 
+  const activeLabel = METRIC_TYPES.find((t) => t.value === activeTab)?.label ?? "Metric";
+  const latest = filteredMetrics[0];
+
   return (
-    <div className="mt-4 space-y-4">
-      {/* Quick Entry */}
-      <Card className="surface border-white/10 rounded-2xl">
-        <CardContent className="p-4 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Metric</Label>
-              <Select
-                value={metricType}
-                onValueChange={(v) => {
-                  if (!v) return;
-                  setMetricType(v);
-                  setActiveTab(v);
-                }}
-              >
-                <SelectTrigger className="h-11 rounded-xl bg-white/5 border-white/10">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {METRIC_TYPES.map((t) => (
-                    <SelectItem key={t.value} value={t.value}>
-                      {t.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Date</Label>
-              <Input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="h-11 rounded-xl bg-white/5 border-white/10"
-              />
-            </div>
-          </div>
-          <div className="flex gap-3">
-            <div className="flex-1 relative">
-              <Input
-                type="number"
-                inputMode="decimal"
-                placeholder="Value"
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                className="h-12 rounded-xl bg-white/5 border-white/10 pr-12 text-lg font-semibold"
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                {currentUnit}
-              </span>
-            </div>
-            <Button
-              onClick={handleSubmit}
-              disabled={pending || !value}
-              className="h-12 px-6 rounded-xl bg-primary text-primary-foreground font-semibold"
-            >
-              Log
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Tab bar */}
-      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-        {METRIC_TYPES.map((t) => (
-          <button
-            key={t.value}
-            onClick={() => setActiveTab(t.value)}
-            className={cn(
-              "shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors border",
-              activeTab === t.value
-                ? "bg-primary text-primary-foreground border-transparent"
-                : "border-white/10 text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Latest + Trend */}
-      {filteredMetrics.length > 0 && (
-        <div className="flex items-center gap-3 surface rounded-2xl p-4 border border-white/10">
-          <div className="flex-1">
-            <p className="text-3xl font-bold">
-              {filteredMetrics[0].value}
-              <span className="text-base text-muted-foreground ml-1">
-                {filteredMetrics[0].unit}
-              </span>
+    <div className="space-y-3">
+      {/* Latest reading: the one bold element */}
+      <section aria-label={`Latest ${activeLabel.toLowerCase()}`} className="relative overflow-hidden rounded-[2rem] bg-pull p-6 text-ink">
+        <span aria-hidden className="pointer-events-none absolute -right-3 -top-5 select-none whitespace-nowrap font-display text-[7rem] leading-none text-white/25">
+          {activeLabel}
+        </span>
+        <p className="relative text-sm font-semibold text-ink/70">Latest {activeLabel.toLowerCase()}</p>
+        {latest ? (
+          <>
+            <p className="relative mt-6 flex items-baseline gap-1.5">
+              <span className="font-display tabular text-6xl">{latest.value}</span>
+              <span className="text-lg font-semibold">{latest.unit}</span>
             </p>
-            <p className="text-xs text-muted-foreground">Latest reading</p>
+            <div className="relative mt-4 flex flex-wrap items-center gap-2 text-sm font-semibold">
+              <span className="rounded-full bg-white/35 px-3 py-1">{latest.date}</span>
+              {trend && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-white/35 px-3 py-1">
+                  {trend === "up" && <TrendingUp className="h-4 w-4" />}
+                  {trend === "down" && <TrendingDown className="h-4 w-4" />}
+                  {trend === "same" && <Minus className="h-4 w-4" />}
+                  {trend === "same"
+                    ? "No change"
+                    : `${trend === "up" ? "+" : "−"}${Math.abs(latest.value - filteredMetrics[1].value).toFixed(1)} ${latest.unit} since last`}
+                </span>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="relative mt-6 font-display text-[2.6rem] leading-[0.95]">No readings yet<span className="text-white">.</span></p>
+            <p className="relative mt-3 text-sm font-medium text-ink/75">Log your first one below.</p>
+          </>
+        )}
+      </section>
+
+      {/* Quick entry */}
+      <section aria-labelledby="log-heading" className="rounded-3xl bg-card p-5 shadow-soft dark:ring-1 dark:ring-white/5">
+        <h2 id="log-heading" className="font-display text-xl">Log a reading</h2>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="metric-type" className="text-sm text-muted-foreground">Metric</Label>
+            <Select
+              value={metricType}
+              onValueChange={(v) => {
+                if (!v) return;
+                setMetricType(v);
+                setActiveTab(v);
+              }}
+            >
+              <SelectTrigger id="metric-type" className="w-full">
+                <SelectValue>{(value: string) => METRIC_TYPES.find((t) => t.value === value)?.label ?? value}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {METRIC_TYPES.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>
+                    {t.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          {trend && (
-            <div
+          <div className="space-y-1.5">
+            <Label htmlFor="metric-date" className="text-sm text-muted-foreground">Date</Label>
+            <Input id="metric-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
+        </div>
+        <div className="mt-3 flex gap-3">
+          <div className="relative flex-1">
+            <Label htmlFor="metric-value" className="sr-only">Value</Label>
+            <Input
+              id="metric-value"
+              type="number"
+              inputMode="decimal"
+              placeholder="Value"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              className="h-14 pr-14 font-display text-2xl"
+            />
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground">{currentUnit}</span>
+          </div>
+          <Button onClick={handleSubmit} disabled={pending || !value} size="lg">
+            Log
+          </Button>
+        </div>
+      </section>
+
+      {/* History */}
+      <section aria-labelledby="history-heading" className="pt-5">
+        <h2 id="history-heading" className="font-display text-xl">History</h2>
+        <div role="tablist" aria-label="Metric" className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1 no-scrollbar sm:-mx-6 sm:px-6">
+          {METRIC_TYPES.map((t) => (
+            <button
+              key={t.value}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === t.value}
+              onClick={() => setActiveTab(t.value)}
               className={cn(
-                "flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium",
-                trend === "up" && "bg-emerald-500/20 text-emerald-400",
-                trend === "down" && "bg-rose-500/20 text-rose-400",
-                trend === "same" && "bg-muted text-muted-foreground"
+                "h-10 shrink-0 rounded-full px-4 text-sm font-semibold transition-colors",
+                activeTab === t.value ? "bg-primary text-primary-foreground shadow-glow" : "bg-card text-muted-foreground shadow-soft hover:text-foreground"
               )}
             >
-              {trend === "up" && <TrendingUp className="h-3 w-3" />}
-              {trend === "down" && <TrendingDown className="h-3 w-3" />}
-              {trend === "same" && <Minus className="h-3 w-3" />}
-              {trend === "same"
-                ? "No change"
-                : `${Math.abs(filteredMetrics[0].value - filteredMetrics[1].value).toFixed(1)} ${filteredMetrics[0].unit}`}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* History List */}
-      <div className="space-y-1">
-        {filteredMetrics.map((metric) => (
-          <div
-            key={metric.id}
-            className="flex items-center justify-between rounded-xl p-3 hover:bg-white/5 transition-colors"
-          >
-            <div>
-              <p className="text-sm font-medium">
-                {metric.value} {metric.unit}
-              </p>
-              <p className="text-xs text-muted-foreground">{metric.date}</p>
-            </div>
-            <button
-              onClick={() => handleDelete(metric.id)}
-              disabled={pending}
-              className="text-muted-foreground hover:text-destructive transition-colors p-1"
-            >
-              <Trash2 className="h-4 w-4" />
+              {t.label}
             </button>
-          </div>
-        ))}
+          ))}
+        </div>
 
-        {filteredMetrics.length === 0 && (
-          <div className="text-center py-12 text-muted-foreground">
-            <p>No {activeTab.replace("_", " ")} entries yet</p>
+        {filteredMetrics.length > 0 ? (
+          <ul className="mt-3 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
+            {filteredMetrics.map((metric) => (
+              <li key={metric.id} className="grid grid-cols-[1fr_7.5rem_3rem] items-center">
+                <span className="px-4 py-3 text-[0.95rem]">{metric.date}</span>
+                <span className="tabular flex h-full items-center justify-end border-l border-border px-4 font-semibold">
+                  {metric.value} <span className="ml-1 text-sm font-normal text-muted-foreground">{metric.unit}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(metric.id)}
+                  disabled={pending}
+                  aria-label={`Delete ${activeLabel.toLowerCase()} reading from ${metric.date}`}
+                  className="flex h-full min-h-12 items-center justify-center border-l border-border text-muted-foreground transition-colors hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="mt-3 rounded-2xl border border-dashed border-border px-6 py-10 text-center text-sm text-muted-foreground">
+            No {activeLabel.toLowerCase()} readings yet. Choose {activeLabel.toLowerCase()} above and log one.
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }

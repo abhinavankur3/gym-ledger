@@ -8,10 +8,10 @@ import {
   exercises,
   gymAttendance,
 } from "@/lib/db/schema";
-import { BlurFade } from "@/components/ui/blur-fade";
+import { PageHeader } from "@/components/layout/page-header";
 import { ChartsClient } from "./charts-client";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { CalendarCheck, ChevronRight, Plus, Ruler } from "lucide-react";
 import { getUserTimeZone, localDateKey } from "@/lib/dates";
 
 export default async function ChartsPage() {
@@ -130,23 +130,37 @@ export default async function ChartsPage() {
   }
 
   return (
-    <div className="px-4 pt-8">
-      <BlurFade delay={0}>
-        <div className="flex items-end justify-between gap-4">
-          <div><p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Your trends</p><h1 className="mt-1 text-3xl font-bold tracking-tight">Progress</h1></div>
-          <Link href="/app/metrics" className="inline-flex h-10 items-center gap-1.5 rounded-2xl border border-border bg-card px-3 text-sm font-semibold text-primary hover:border-primary/40"><Plus className="h-4 w-4" /> Log weight</Link>
-        </div>
-      </BlurFade>
+    <main className="pb-6">
+      <PageHeader
+        title="Progress"
+        subtitle="Weight, volume, attendance and records"
+        action={
+          <Link href="/app/metrics" className="inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-2xl bg-card px-4 text-sm font-semibold text-primary shadow-soft hover:bg-muted">
+            <Plus className="h-4 w-4" /> Log weight
+          </Link>
+        }
+      />
 
-      <BlurFade delay={0.1}>
-        <ChartsClient
-          weightData={weightData.map((w) => ({ date: w.date, value: w.value, unit: w.unit }))}
-          attendanceData={attendanceData.filter((a) => a.checkIn).map((a) => ({ date: localDateKey(a.checkIn, tz) }))}
-          today={localDateKey(new Date(), tz)}
-          volumeData={volumeData}
-          prExercises={prExercises}
-        />
-      </BlurFade>
-    </div>
+      <ChartsClient
+        weightData={weightData.map((w) => ({ date: w.date, value: w.value, unit: w.unit }))}
+        attendanceData={attendanceData.filter((a) => a.checkIn).map((a) => ({ date: localDateKey(a.checkIn, tz) }))}
+        today={localDateKey(new Date(), tz)}
+        volumeData={volumeData}
+        prExercises={prExercises}
+      />
+
+      <nav aria-label="Progress records" className="mt-3 divide-y divide-border overflow-hidden rounded-3xl bg-card shadow-soft dark:ring-1 dark:ring-white/5">
+        <Link href="/app/metrics" className="flex items-center gap-3 p-4 hover:bg-muted/50">
+          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-pull/15 text-pull"><Ruler className="h-5 w-5" /></span>
+          <span className="min-w-0 flex-1"><span className="block font-semibold">Body metrics</span><span className="block text-sm text-muted-foreground">Weight, body fat and measurements</span></span>
+          <ChevronRight className="h-5 w-5 text-muted-foreground" />
+        </Link>
+        <Link href="/app/attendance" className="flex items-center gap-3 p-4 hover:bg-muted/50">
+          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-legs/15 text-legs"><CalendarCheck className="h-5 w-5" /></span>
+          <span className="min-w-0 flex-1"><span className="block font-semibold">Attendance</span><span className="block text-sm text-muted-foreground">Check-ins, calendar and streak</span></span>
+          <ChevronRight className="h-5 w-5 text-muted-foreground" />
+        </Link>
+      </nav>
+    </main>
   );
 }

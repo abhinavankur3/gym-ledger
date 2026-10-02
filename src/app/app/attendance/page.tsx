@@ -1,12 +1,11 @@
-import Link from "next/link";
 import { eq, and, gte, sql, desc } from "drizzle-orm";
 import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/dal";
 import { gymAttendance } from "@/lib/db/schema";
-import { BlurFade } from "@/components/ui/blur-fade";
+import { PageHeader } from "@/components/layout/page-header";
 import { AttendanceCalendar } from "./attendance-calendar";
 import { CheckInButton } from "./check-in-button";
-import { ArrowLeft, Flame } from "lucide-react";
+import { Flame } from "lucide-react";
 import { getUserTimeZone, localDateKey, startOfLocalDayIso } from "@/lib/dates";
 
 export default async function AttendancePage() {
@@ -44,50 +43,42 @@ export default async function AttendancePage() {
   const monthPrefix = today.slice(0, 8);
   const attendedDays = new Set([...attendedDates].filter((d) => d.startsWith(monthPrefix)));
 
+  const visitsThisMonth = attendedDays.size;
+
   return (
-    <div className="px-4 pt-8">
-      <BlurFade delay={0}>
-        <Link href="/app/more" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> More</Link>
-        <h1 className="text-2xl font-bold tracking-tight">Attendance</h1>
-      </BlurFade>
+    <main className="pb-6">
+      <PageHeader title="Attendance" subtitle={`${visitsThisMonth} ${visitsThisMonth === 1 ? "visit" : "visits"} this month`} back={{ href: "/app/progress", label: "Progress" }} />
 
-      {/* Streak */}
-      <BlurFade delay={0.1}>
-        <div className="mt-4 flex items-center gap-3 surface rounded-2xl p-4 border border-white/10">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-orange-500/20">
-            <Flame className="h-6 w-6 text-orange-400" />
-          </div>
-          <div>
-            <p className="text-2xl font-bold">{streak} day streak</p>
-            <p className="text-xs text-muted-foreground">
-              {streak > 0 ? "Keep it going!" : "Start your streak today!"}
-            </p>
-          </div>
-        </div>
-      </BlurFade>
+      {/* Streak: the one bold element */}
+      <section aria-label="Streak" className="relative overflow-hidden rounded-[2rem] bg-legs p-6 text-ink">
+        <span aria-hidden className="pointer-events-none absolute -right-2 -top-6 select-none font-display text-[9rem] leading-none text-white/25">
+          {streak}
+        </span>
+        <span className="relative flex h-11 w-11 items-center justify-center rounded-2xl bg-white/35">
+          <Flame className="h-5 w-5" />
+        </span>
+        <p className="relative mt-5 flex items-baseline gap-2">
+          <span className="font-display tabular text-6xl">{streak}</span>
+          <span className="text-lg font-semibold">day streak</span>
+        </p>
+        <p className="relative mt-2 text-sm font-medium text-ink/75">
+          {streak > 0 ? "Check in again tomorrow to keep it going." : "Check in today to start a streak."}
+        </p>
+      </section>
 
-      {/* Calendar */}
-      <BlurFade delay={0.2}>
-        <div className="mt-4">
-          <AttendanceCalendar
-            year={year}
-            month={month}
-            attendedDays={Array.from(attendedDays)}
-            activeCheckIn={!!activeCheckIn}
-            today={today}
-          />
-        </div>
-      </BlurFade>
+      <div className="mt-3">
+        <AttendanceCalendar
+          year={year}
+          month={month}
+          attendedDays={Array.from(attendedDays)}
+          activeCheckIn={!!activeCheckIn}
+          today={today}
+        />
+      </div>
 
-      {/* Check In/Out Button */}
-      <BlurFade delay={0.3}>
-        <div className="mt-6">
-          <CheckInButton
-            isCheckedIn={!!activeCheckIn}
-            checkInTime={activeCheckIn?.checkIn}
-          />
-        </div>
-      </BlurFade>
-    </div>
+      <div className="mt-6">
+        <CheckInButton isCheckedIn={!!activeCheckIn} checkInTime={activeCheckIn?.checkIn} />
+      </div>
+    </main>
   );
 }

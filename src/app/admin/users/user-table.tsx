@@ -10,7 +10,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -23,6 +22,7 @@ import { Label } from "@/components/ui/label";
 import { KeyRound, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { cn } from "@/lib/utils";
 
 type User = {
   id: number;
@@ -61,67 +61,54 @@ export function UserTable({ users }: { users: User[] }) {
     }
   }
 
+  function openReset(userId: number) {
+    setSelectedUserId(userId);
+    setResetDialogOpen(true);
+  }
+
   return (
     <>
-      <div className="surface rounded-2xl border-white/10 overflow-x-auto">
-        <Table className="min-w-[540px]">
+      {/* Mobile: one card per user */}
+      <ul className="space-y-3 md:hidden">
+        {users.map((user) => (
+          <li key={user.id} className="rounded-3xl bg-card p-4 shadow-soft dark:ring-1 dark:ring-white/5">
+            <div className="flex items-start gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-muted font-display text-lg">{user.name.slice(0, 1).toUpperCase()}</span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-semibold">{user.name}</p>
+                <p className="truncate text-sm text-muted-foreground">{user.email}</p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <RoleBadge role={user.role} />
+                  {user.forcePasswordChange && <PendingBadge />}
+                </div>
+              </div>
+              {user.role !== "admin" && <UserActions name={user.name} onReset={() => openReset(user.id)} onDelete={() => setDeleteUserId(user.id)} />}
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      {/* Desktop: table */}
+      <div className="hidden overflow-hidden rounded-3xl bg-card shadow-soft md:block dark:ring-1 dark:ring-white/5">
+        <Table>
           <TableHeader>
-            <TableRow className="border-white/10">
-              <TableHead>Name</TableHead>
+            <TableRow className="border-border hover:bg-transparent">
+              <TableHead className="h-12 pl-5">Name</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Role</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className="pr-5 text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {users.map((user) => (
-              <TableRow key={user.id} className="border-white/5">
-                <TableCell className="font-medium">{user.name}</TableCell>
+              <TableRow key={user.id} className="border-border">
+                <TableCell className="py-3 pl-5 font-semibold">{user.name}</TableCell>
                 <TableCell className="text-muted-foreground">{user.email}</TableCell>
-                <TableCell>
-                  <Badge
-                    variant={user.role === "admin" ? "default" : "secondary"}
-                    className={
-                      user.role === "admin"
-                        ? "bg-primary text-primary-foreground border-0"
-                        : ""
-                    }
-                  >
-                    {user.role}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  {user.forcePasswordChange && (
-                    <Badge variant="outline" className="border-amber-500/50 text-amber-500">
-                      Pending password change
-                    </Badge>
-                  )}
-                </TableCell>
-                <TableCell className="text-right">
-                  {user.role !== "admin" && (
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 rounded-lg hover:bg-white/10"
-                        onClick={() => {
-                          setSelectedUserId(user.id);
-                          setResetDialogOpen(true);
-                        }}
-                      >
-                        <KeyRound className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 rounded-lg hover:bg-destructive/20 text-destructive"
-                        onClick={() => setDeleteUserId(user.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
+                <TableCell><RoleBadge role={user.role} /></TableCell>
+                <TableCell>{user.forcePasswordChange && <PendingBadge />}</TableCell>
+                <TableCell className="pr-5 text-right">
+                  {user.role !== "admin" && <UserActions name={user.name} onReset={() => openReset(user.id)} onDelete={() => setDeleteUserId(user.id)} />}
                 </TableCell>
               </TableRow>
             ))}
@@ -130,30 +117,27 @@ export function UserTable({ users }: { users: User[] }) {
       </div>
 
       <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
-        <DialogContent className="surface border-white/10 rounded-2xl">
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>Reset Password</DialogTitle>
+            <DialogTitle>Reset password</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>New Temporary Password</Label>
+              <Label htmlFor="reset-password">New temporary password</Label>
               <Input
+                id="reset-password"
                 type="password"
+                autoComplete="new-password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 minLength={8}
-                className="h-11 rounded-xl bg-white/5 border-white/10"
               />
               <p className="text-xs text-muted-foreground">
-                User will be forced to change this on next login
+                At least 8 characters. They’ll be asked to change it when they next log in.
               </p>
             </div>
-            <Button
-              onClick={handleResetPassword}
-              className="w-full bg-primary text-primary-foreground rounded-xl"
-              disabled={newPassword.length < 8}
-            >
-              Reset Password
+            <Button onClick={handleResetPassword} size="lg" className="w-full" disabled={newPassword.length < 8}>
+              Reset password
             </Button>
           </div>
         </DialogContent>
@@ -169,5 +153,30 @@ export function UserTable({ users }: { users: User[] }) {
         onConfirm={() => deleteUserId !== null && handleDelete(deleteUserId)}
       />
     </>
+  );
+}
+
+function RoleBadge({ role }: { role: User["role"] }) {
+  return (
+    <span className={cn("inline-flex h-6 items-center rounded-full px-2.5 text-xs font-semibold", role === "admin" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
+      {role === "admin" ? "Admin" : "Member"}
+    </span>
+  );
+}
+
+function PendingBadge() {
+  return <span className="inline-flex h-6 items-center rounded-full bg-sun/25 px-2.5 text-xs font-semibold text-ink dark:text-sun">Must change password</span>;
+}
+
+function UserActions({ name, onReset, onDelete }: { name: string; onReset: () => void; onDelete: () => void }) {
+  return (
+    <div className="flex shrink-0 justify-end gap-1">
+      <Button variant="ghost" size="icon" aria-label={`Reset password for ${name}`} onClick={onReset}>
+        <KeyRound className="h-4 w-4" />
+      </Button>
+      <Button variant="ghost" size="icon" aria-label={`Delete ${name}`} className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={onDelete}>
+        <Trash2 className="h-4 w-4" />
+      </Button>
+    </div>
   );
 }

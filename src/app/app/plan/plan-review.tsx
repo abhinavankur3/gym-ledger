@@ -2,14 +2,25 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Dumbbell, Loader2, RefreshCw } from "lucide-react";
+import { Check, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { FactTable } from "@/components/fact-table";
 import { cn } from "@/lib/utils";
+import { TONE_BG, type SessionTone } from "@/lib/muscles";
 import { regeneratePlan, confirmPlan } from "./actions";
 import { WEEKDAY_LABELS, trainingWeekdays, type Plan } from "@/lib/ai/plan-types";
 
 const FEEDBACK_LIMIT = 600;
+const WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+/** Plan days only carry exercise names, so the session colour comes from the day's name. */
+function dayTone(name: string): SessionTone {
+  const n = name.toLowerCase();
+  if (/push|upper|chest|shoulder/.test(n)) return "push";
+  if (/pull|back/.test(n)) return "pull";
+  if (/lower|leg|squat|glute/.test(n)) return "legs";
+  return "sun";
+}
 
 export function PlanReview({ plan, feedback: initialFeedback }: { plan: Plan; feedback: string }) {
   const [feedback, setFeedback] = useState(initialFeedback);
@@ -41,35 +52,55 @@ export function PlanReview({ plan, feedback: initialFeedback }: { plan: Plan; fe
     });
   }
 
-  return <div className="mt-8 space-y-5">
-    <p className="text-sm text-muted-foreground">
-      {plan.days.length} training days{restDays.length > 0 && <> · Rest on {restDays.join(", ")}</>}
+  return <div className="space-y-6">
+    <p className="text-muted-foreground">
+      {plan.days.length} training days a week.{restDays.length > 0 && <> Rest on {restDays.join(", ")}.</>}
     </p>
+
     <div className="relative" aria-busy={regenerating}>
-      <div className={cn("grid gap-3 sm:grid-cols-2 transition-opacity", regenerating && "pointer-events-none opacity-30")}>
-        {plan.days.map((day, index) => <Card key={`${day.name}-${index}`} className="rounded-3xl border-border bg-card">
-          <CardContent className="p-5">
-            <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">{WEEKDAY_LABELS[weekdays[index]]}</p><h2 className="mt-1 text-lg font-bold">{day.name}</h2></div><Dumbbell className="h-5 w-5 text-muted-foreground" /></div>
-            <ul className="mt-4 space-y-2">{day.exercises.map((exercise, exerciseIndex) => <li key={`${exercise.exercise}-${exerciseIndex}`} className="flex items-center justify-between gap-3 text-sm"><span className="truncate">{exercise.exercise}</span><span className="shrink-0 text-xs text-muted-foreground">{exercise.sets} × {exercise.reps}</span></li>)}</ul>
-          </CardContent>
-        </Card>)}
+      <div className={cn("grid gap-4 sm:grid-cols-2 transition-opacity", regenerating && "pointer-events-none opacity-30")}>
+        {plan.days.map((day, index) => {
+          const tone = dayTone(day.name);
+          return (
+            <article key={`${day.name}-${index}`} className="overflow-hidden rounded-3xl bg-card shadow-soft dark:ring-1 dark:ring-white/5">
+              <div className={cn("relative h-32 overflow-hidden p-5 text-ink", TONE_BG[tone])}>
+                <span aria-hidden className="pointer-events-none absolute -left-1 top-8 select-none whitespace-nowrap font-display text-[5.5rem] leading-none text-white/25">{day.name}</span>
+                <p className="relative text-sm font-semibold text-ink/70">{WEEKDAY_NAMES[weekdays[index]]}</p>
+                <h2 className="relative mt-6 font-display text-3xl">{day.name}<span className="text-white">.</span></h2>
+              </div>
+              <div className="p-3">
+                <FactTable
+                  className="border-0"
+                  rows={day.exercises.map((exercise, exerciseIndex) => ({
+                    key: `${exercise.exercise}-${exerciseIndex}`,
+                    label: exercise.exercise,
+                    value: `${exercise.sets} × ${exercise.reps}`,
+                  }))}
+                />
+              </div>
+            </article>
+          );
+        })}
       </div>
-      {regenerating && <div role="status" className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center">
-        <Loader2 className="h-7 w-7 animate-spin text-primary" />
-        <p className="font-bold">Generating a new version…</p>
-        <p className="max-w-xs text-xs text-muted-foreground">This can take up to a minute.</p>
+      {regenerating && <div role="status" className="absolute inset-0 flex items-start justify-center pt-16">
+        <div className="flex max-w-xs flex-col items-center gap-3 rounded-3xl bg-card px-8 py-7 text-center shadow-lift">
+          <Loader2 className="h-7 w-7 animate-spin text-primary" />
+          <p className="font-display text-xl">Generating a new version</p>
+          <p className="text-sm text-muted-foreground">This can take up to a minute.</p>
+        </div>
       </div>}
     </div>
-    <Card className="rounded-3xl border-primary/20 bg-primary/5"><CardContent className="p-5">
-      <label htmlFor="plan-feedback" className="text-sm font-bold">Want a change?</label>
-      <p className="mt-1 text-xs leading-5 text-muted-foreground">Mention practical preferences like exercises you dislike, equipment you have, or a movement that needs replacing.</p>
-      <textarea id="plan-feedback" value={feedback} onChange={(event) => setFeedback(event.target.value.slice(0, FEEDBACK_LIMIT))} maxLength={FEEDBACK_LIMIT} disabled={pending} aria-describedby="plan-feedback-count" placeholder="e.g. Replace barbell squats because my knee feels uncomfortable." className="mt-4 min-h-24 w-full resize-y rounded-2xl border border-border bg-background p-3 text-sm outline-none ring-primary/30 placeholder:text-muted-foreground focus:ring-2 disabled:opacity-60" />
-      <p id="plan-feedback-count" className={cn("mt-1 text-right text-xs text-muted-foreground", feedback.length >= FEEDBACK_LIMIT && "text-destructive")}>{feedback.length}/{FEEDBACK_LIMIT}</p>
-      {error && <p role="alert" className="mt-2 text-sm font-medium text-destructive">{error}</p>}
+
+    <section className="rounded-3xl bg-card p-5 shadow-soft dark:ring-1 dark:ring-white/5">
+      <label htmlFor="plan-feedback" className="font-display text-xl">Want a change?</label>
+      <p className="mt-1.5 text-sm leading-6 text-muted-foreground">Mention practical preferences like exercises you dislike, equipment you have, or a movement that needs replacing.</p>
+      <textarea id="plan-feedback" value={feedback} onChange={(event) => setFeedback(event.target.value.slice(0, FEEDBACK_LIMIT))} maxLength={FEEDBACK_LIMIT} disabled={pending} aria-describedby="plan-feedback-count" placeholder="e.g. Replace barbell squats because my knee feels uncomfortable." className="mt-4 min-h-28 w-full resize-y rounded-2xl border border-input bg-raised p-4 text-base outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60" />
+      <p id="plan-feedback-count" className={cn("tabular mt-1.5 text-right text-xs text-muted-foreground", feedback.length >= FEEDBACK_LIMIT && "text-destructive")}>{feedback.length}/{FEEDBACK_LIMIT}</p>
+      {error && <p role="alert" className="mt-3 rounded-2xl bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">{error}</p>}
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <Button type="button" variant="outline" onClick={regenerate} disabled={pending} className="h-12 rounded-2xl font-bold">{regenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}{regenerating ? "Generating…" : "Regenerate plan"}</Button>
-        <Button type="button" onClick={confirm} disabled={pending} className="h-12 rounded-2xl font-bold">{pending && busy === "confirm" ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving plan…</> : <><Check className="mr-2 h-4 w-4" />Use this plan</>}</Button>
+        <Button type="button" variant="outline" size="lg" onClick={regenerate} disabled={pending}>{regenerating ? <Loader2 className="h-5 w-5 animate-spin" /> : <RefreshCw className="h-5 w-5" />}{regenerating ? "Generating…" : "Regenerate plan"}</Button>
+        <Button type="button" size="lg" onClick={confirm} disabled={pending}>{pending && busy === "confirm" ? <><Loader2 className="h-5 w-5 animate-spin" />Saving plan…</> : <><Check className="h-5 w-5" />Use this plan</>}</Button>
       </div>
-    </CardContent></Card>
+    </section>
   </div>;
 }

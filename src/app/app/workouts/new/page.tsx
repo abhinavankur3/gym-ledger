@@ -7,10 +7,12 @@ import { getTemplates } from "../templates/actions";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { BlurFade } from "@/components/ui/blur-fade";
-import { Dumbbell, FileText } from "lucide-react";
+import { PageHeader } from "@/components/layout/page-header";
+import { SessionHero } from "@/components/session-hero";
+import { MuscleChip } from "@/components/muscle-chip";
+import { TONE_BG, sessionTone, type SessionTone } from "@/lib/muscles";
+import { cn } from "@/lib/utils";
+import { Loader2 } from "lucide-react";
 
 const QUICK_NAMES = [
   "Push Day",
@@ -24,6 +26,8 @@ const QUICK_NAMES = [
   "Shoulders & Arms",
   "Cardio",
 ];
+
+const TONE_ART = { push: "dumbbell", pull: "kettlebell", legs: "plate", sun: "kettlebell" } as const;
 
 type TemplateItem = {
   id: number;
@@ -67,142 +71,127 @@ export default function NewWorkoutPage() {
   if (templateIdParam) {
     const templateId = Number(templateIdParam);
     const template = templates.find((t) => t.id === templateId);
+    const tone: SessionTone = template ? sessionTone(template.muscleGroups) : "sun";
 
     return (
-      <main className="px-4 pt-8">
-        <BlurFade delay={0}>
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Ready when you are</p><h1 className="mt-1 text-3xl font-bold tracking-tight">Start workout</h1>
-        </BlurFade>
+      <main className="pb-6">
+        <PageHeader title="Start workout" back={{ href: "/app/workouts", label: "Training log" }} />
 
-        <BlurFade delay={0.1}>
-          <div className="mt-6 space-y-4">
-            {template ? (
-              <Card className="surface rounded-3xl border-border">
-                <CardContent className="p-5">
-                  <div className="flex items-center gap-3 mb-3">
-                    <FileText className="h-5 w-5 text-primary" />
-                    <p className="font-semibold text-lg">{template.name}</p>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {template.exerciseCount} exercise{template.exerciseCount !== 1 ? "s" : ""}
-                  </p>
-                  {template.muscleGroups.length > 0 && (
-                    <div className="mt-2 flex gap-1.5 flex-wrap">
-                      {template.muscleGroups.map((mg) => (
-                        <Badge
-                          key={mg}
-                          variant="outline"
-                          className="text-[9px] border-white/10"
-                        >
-                          {mg.replace("_", " ")}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground text-sm">Loading template...</p>
+        {template ? (
+          <>
+            <SessionHero
+              tone={tone}
+              kicker="Ready when you are"
+              title={template.name}
+              art={TONE_ART[tone]}
+              meta={`${template.exerciseCount} exercise${template.exerciseCount !== 1 ? "s" : ""}`}
+            />
+            {template.muscleGroups.length > 0 && (
+              <div className="mt-16 flex flex-wrap gap-1.5">
+                {template.muscleGroups.map((mg) => (
+                  <MuscleChip key={mg} muscle={mg} />
+                ))}
               </div>
             )}
-
-            <Button
-              onClick={() => handleStartFromTemplate(templateId)}
-              disabled={pending}
-            className="h-14 w-full rounded-2xl bg-primary text-base font-bold text-primary-foreground hover:bg-primary/90"
-            >
-              <Dumbbell className="h-5 w-5 mr-2" />
-              {pending
-                ? "Starting..."
-                : `Start ${template?.name ?? "Workout"}`}
-            </Button>
-
-            <button
-              onClick={() => router.push("/app/workouts/new")}
-              className="w-full text-center text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
-            >
-              Start without template instead
-            </button>
+          </>
+        ) : (
+          <div className="flex h-60 items-center justify-center rounded-[2rem] bg-muted text-sm text-muted-foreground">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading session…
           </div>
-        </BlurFade>
+        )}
+
+        <div className={cn("space-y-2", template && template.muscleGroups.length > 0 ? "mt-6" : "mt-16")}>
+          <Button
+            onClick={() => handleStartFromTemplate(templateId)}
+            disabled={pending}
+            size="lg"
+            className="w-full"
+          >
+            {pending ? <><Loader2 className="h-5 w-5 animate-spin" /> Starting…</> : `Start ${template?.name ?? "workout"}`}
+          </Button>
+
+          <button
+            type="button"
+            onClick={() => router.push("/app/workouts/new")}
+            className="h-11 w-full rounded-2xl text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Start an empty workout instead
+          </button>
+        </div>
       </main>
     );
   }
 
   return (
-    <main className="px-4 pt-8">
-      <BlurFade delay={0}>
-        <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Training log</p><h1 className="mt-1 text-3xl font-bold tracking-tight">New workout</h1>
-      </BlurFade>
+    <main className="pb-6">
+      <PageHeader title="New workout" back={{ href: "/app/workouts", label: "Training log" }} />
 
-      {/* From Template Section */}
       {templates.length > 0 && (
-        <BlurFade delay={0.05}>
-          <div className="mt-6">
-            <p className="text-xs text-muted-foreground mb-2">From template</p>
-              <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
-              {templates.map((t) => (
+        <section aria-labelledby="from-plan" className="mb-8">
+          <h2 id="from-plan" className="font-display text-xl">From your plan</h2>
+          <div className="no-scrollbar -mx-4 mt-3 flex gap-3 overflow-x-auto px-4 pb-4 sm:-mx-6 sm:px-6">
+            {templates.map((t) => {
+              const tone = sessionTone(t.muscleGroups);
+              return (
                 <button
                   key={t.id}
+                  type="button"
                   onClick={() => handleStartFromTemplate(t.id)}
                   disabled={pending}
-                  className="flex-shrink-0 w-36"
+                  className={cn(
+                    "relative flex h-36 w-40 shrink-0 flex-col justify-between overflow-hidden rounded-3xl p-4 text-left text-ink shadow-soft transition-transform active:scale-[0.98] disabled:opacity-60",
+                    TONE_BG[tone]
+                  )}
                 >
-                  <Card className="surface h-full rounded-2xl border-border transition-colors hover:border-primary/40">
-                    <CardContent className="p-3">
-                      <FileText className="h-4 w-4 text-primary mb-1" />
-                      <p className="text-sm font-medium truncate">{t.name}</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">
-                        {t.exerciseCount} exercises
-                      </p>
-                    </CardContent>
-                  </Card>
+                  <span aria-hidden className="pointer-events-none absolute -left-1 top-8 select-none whitespace-nowrap font-display text-[4.5rem] leading-none text-white/25">
+                    {t.name}
+                  </span>
+                  <span className="relative text-sm font-semibold text-ink/70">
+                    {t.exerciseCount} exercise{t.exerciseCount !== 1 ? "s" : ""}
+                  </span>
+                  <span className="relative line-clamp-2 font-display text-xl leading-tight">{t.name}</span>
                 </button>
-              ))}
-            </div>
+              );
+            })}
           </div>
-        </BlurFade>
+        </section>
       )}
 
-      <BlurFade delay={0.1}>
-        <div className="mt-6 space-y-4">
-          <div className="space-y-2">
-            <Label>Workout Name</Label>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Push Day"
-              className="h-12 rounded-xl border-border bg-card"
-              autoFocus
-            />
-          </div>
-
-          <div>
-            <p className="text-xs text-muted-foreground mb-2">Quick select</p>
-            <div className="flex flex-wrap gap-2">
-              {QUICK_NAMES.map((qn) => (
-                <button
-                  key={qn}
-                  onClick={() => setName(qn)}
-              className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
-                >
-                  {qn}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <Button
-            onClick={handleStart}
-            disabled={pending || !name.trim()}
-            className="mt-4 h-14 w-full rounded-2xl bg-primary text-base font-bold text-primary-foreground hover:bg-primary/90"
-          >
-            <Dumbbell className="h-5 w-5 mr-2" />
-            {pending ? "Starting..." : "Start Workout"}
-          </Button>
+      <section aria-labelledby="custom-workout" className="rounded-3xl bg-card p-5 shadow-soft dark:ring-1 dark:ring-white/5">
+        <h2 id="custom-workout" className="font-display text-xl">{templates.length > 0 ? "Or name your own" : "Name your session"}</h2>
+        <div className="mt-4 space-y-2">
+          <Label htmlFor="workout-name">Workout name</Label>
+          <Input
+            id="workout-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleStart()}
+            placeholder="e.g. Push Day"
+            autoFocus={templates.length === 0}
+          />
         </div>
-      </BlurFade>
+
+        <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Quick names">
+          {QUICK_NAMES.map((qn) => (
+            <button
+              key={qn}
+              type="button"
+              onClick={() => setName(qn)}
+              aria-pressed={name === qn}
+              className={cn(
+                "h-10 rounded-full px-4 text-sm font-medium transition-colors",
+                name === qn ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {qn}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <Button onClick={handleStart} disabled={pending || !name.trim()} size="lg" className="mt-5 w-full">
+        {pending ? <><Loader2 className="h-5 w-5 animate-spin" /> Starting…</> : name.trim() ? `Start ${name.trim()}` : "Start workout"}
+      </Button>
     </main>
   );
 }

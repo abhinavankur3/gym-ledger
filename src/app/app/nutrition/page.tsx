@@ -1,7 +1,21 @@
-import Link from "next/link";
-import { Apple, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { CalendarDays, Camera, Target } from "lucide-react";
+import { SessionHero } from "@/components/session-hero";
+import { ProfileButton } from "@/components/layout/page-header";
+import { PlannedFeatures } from "../coach/placeholder";
 
 export default function NutritionPage() {
-  return <main className="px-4 pt-8"><Link href="/app/more" className="text-sm font-semibold text-muted-foreground">← More</Link><div className="mt-10 rounded-3xl border border-border bg-card p-6"><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/12"><Apple className="h-6 w-6 text-primary" /></div><p className="mt-6 text-xs font-bold uppercase tracking-[0.16em] text-primary">Nutrition</p><h1 className="mt-2 text-3xl font-bold">Fuel your training.</h1><p className="mt-3 text-sm leading-6 text-muted-foreground">Meal logging and simple daily targets are next in the redesign. We&apos;ll keep the focus on fast entries, useful protein guidance, and no giant food database.</p><Button disabled className="mt-6 h-11 w-full rounded-2xl">Coming next</Button></div><div className="mt-4 flex gap-3 rounded-2xl border border-primary/20 bg-primary/8 p-4"><Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><p className="text-sm leading-5">Your workout history will become the context for smarter nutrition recommendations.</p></div></main>;
+  return (
+    <main className="pb-6">
+      <div className="flex justify-end pt-6 md:pt-10"><ProfileButton /></div>
+      <SessionHero tone="legs" kicker="Nutrition" title="Fuel the plan" watermark="Fuel" art="bowl" asHeading className="mt-3" />
+      <PlannedFeatures
+        intro="Nutrition is being built into your coach so meals and training share one plan."
+        features={[
+          { icon: Target, title: "Daily targets", detail: "Calories and protein worked out from your goal, body and training days." },
+          { icon: CalendarDays, title: "A meal plan that fits", detail: "Suggestions that respect your diet and anything you avoid." },
+          { icon: Camera, title: "Effortless logging", detail: "Describe a meal in a few words and your coach fills in the rest." },
+        ]}
+      />
+    </main>
+  );
 }

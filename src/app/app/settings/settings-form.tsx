@@ -3,38 +3,38 @@
 import { useState, useTransition } from "react";
 import { updatePreferences, changePasswordFromSettings } from "./actions";
 import { logout } from "@/lib/actions/auth";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { BlurFade } from "@/components/ui/blur-fade";
+import { PageHeader } from "@/components/layout/page-header";
 import { cn } from "@/lib/utils";
-import Link from "next/link";
-import { User, Ruler, Palette, Lock, LogOut, ArrowLeft } from "lucide-react";
+import { UserRound, Ruler, Palette, Lock, LogOut } from "lucide-react";
 import { toast } from "sonner";
 
 function SegmentedControl({
+  label,
   options,
   value,
   onChange,
 }: {
+  label: string;
   options: { label: string; value: string }[];
   value: string;
   onChange: (v: string) => void;
 }) {
   return (
-    <div className="flex rounded-xl bg-white/5 p-1">
+    <div role="radiogroup" aria-label={label} className="flex rounded-2xl bg-muted p-1">
       {options.map((opt) => (
         <button
           type="button"
+          role="radio"
           key={opt.value}
-          aria-pressed={value === opt.value}
+          aria-checked={value === opt.value}
           onClick={() => onChange(opt.value)}
           className={cn(
-            "flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+            "h-10 flex-1 rounded-xl px-3 text-sm font-semibold transition-colors",
             value === opt.value
-              ? "bg-primary text-primary-foreground shadow"
+              ? "bg-primary text-primary-foreground shadow-glow"
               : "text-muted-foreground hover:text-foreground"
           )}
         >
@@ -42,6 +42,18 @@ function SegmentedControl({
         </button>
       ))}
     </div>
+  );
+}
+
+function Section({ icon, tone, title, children }: { icon: React.ReactNode; tone: string; title: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-3xl bg-card p-5 shadow-soft dark:ring-1 dark:ring-white/5">
+      <h2 className="flex items-center gap-3 font-display text-lg">
+        <span className={cn("flex h-9 w-9 items-center justify-center rounded-xl", tone)}>{icon}</span>
+        {title}
+      </h2>
+      <div className="mt-4 space-y-4">{children}</div>
+    </section>
   );
 }
 
@@ -70,7 +82,7 @@ export function SettingsForm({ initialName, initialWeightUnit, initialMeasuremen
 
     startTransition(async () => {
       const result = await updatePreferences(formData);
-      if (result?.success) toast.success("Settings saved!");
+      if (result?.success) toast.success("Settings saved");
     });
   }
 
@@ -84,7 +96,7 @@ export function SettingsForm({ initialName, initialWeightUnit, initialMeasuremen
       if (result?.error) {
         toast.error(result.error);
       } else {
-        toast.success("Password changed!");
+        toast.success("Password changed");
         setCurrentPw("");
         setNewPw("");
       }
@@ -92,160 +104,67 @@ export function SettingsForm({ initialName, initialWeightUnit, initialMeasuremen
   }
 
   return (
-    <div className="px-4 pt-8">
-      <BlurFade delay={0}>
-        <Link href="/app/more" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> More</Link>
-        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-      </BlurFade>
+    <div className="pb-6">
+      <PageHeader title="Settings" back={{ href: "/app/more", label: "More" }} hideProfile />
 
-      <div className="mt-4 space-y-4">
-        {/* Profile */}
-        <BlurFade delay={0.1}>
-          <Card className="surface border-white/10 rounded-2xl">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <User className="h-4 w-4 text-primary" />
-                Profile
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="space-y-1">
-                <Label className="text-xs">Display Name</Label>
-                <Input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Your name"
-                  className="h-11 rounded-xl bg-white/5 border-white/10"
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </BlurFade>
+      <div className="space-y-3">
+        <Section icon={<UserRound className="h-[18px] w-[18px]" />} tone="bg-pull/15 text-pull" title="Profile">
+          <div className="space-y-2">
+            <Label htmlFor="settings-name">Display name</Label>
+            <Input id="settings-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" />
+          </div>
+        </Section>
 
-        {/* Units */}
-        <BlurFade delay={0.15}>
-          <Card className="surface border-white/10 rounded-2xl">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Ruler className="h-4 w-4 text-primary" />
-                Units
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-1">
-                <Label className="text-xs">Weight</Label>
-                <SegmentedControl
-                  options={[
-                    { label: "kg", value: "kg" },
-                    { label: "lbs", value: "lbs" },
-                  ]}
-                  value={weightUnit}
-                  onChange={setWeightUnit}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Measurements</Label>
-                <SegmentedControl
-                  options={[
-                    { label: "cm", value: "cm" },
-                    { label: "in", value: "in" },
-                  ]}
-                  value={measurementUnit}
-                  onChange={setMeasurementUnit}
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </BlurFade>
+        <Section icon={<Ruler className="h-[18px] w-[18px]" />} tone="bg-legs/15 text-legs" title="Units">
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Weight</p>
+            <SegmentedControl label="Weight unit" options={[{ label: "kg", value: "kg" }, { label: "lbs", value: "lbs" }]} value={weightUnit} onChange={setWeightUnit} />
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Measurements</p>
+            <SegmentedControl label="Measurement unit" options={[{ label: "cm", value: "cm" }, { label: "in", value: "in" }]} value={measurementUnit} onChange={setMeasurementUnit} />
+          </div>
+        </Section>
 
-        {/* Theme */}
-        <BlurFade delay={0.2}>
-          <Card className="surface border-white/10 rounded-2xl">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Palette className="h-4 w-4 text-primary" />
-                Theme
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <SegmentedControl
-                options={[
-                  { label: "Light", value: "light" },
-                  { label: "Dark", value: "dark" },
-                  { label: "System", value: "system" },
-                ]}
-                value={theme}
-                onChange={setTheme}
-              />
-            </CardContent>
-          </Card>
-        </BlurFade>
+        <Section icon={<Palette className="h-[18px] w-[18px]" />} tone="bg-sun/20 text-ink dark:text-sun" title="Appearance">
+          <SegmentedControl
+            label="Theme"
+            options={[{ label: "Light", value: "light" }, { label: "Dark", value: "dark" }, { label: "System", value: "system" }]}
+            value={theme}
+            onChange={setTheme}
+          />
+          <p className="text-xs text-muted-foreground">System follows your device setting.</p>
+        </Section>
 
-        <BlurFade delay={0.25}>
-          <Button
-            onClick={handleSavePrefs}
-            disabled={pending}
-            className="w-full h-12 rounded-2xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90"
-          >
-            Save Preferences
-          </Button>
-        </BlurFade>
+        <Button onClick={handleSavePrefs} disabled={pending} size="lg" className="w-full">
+          {pending ? "Saving…" : "Save settings"}
+        </Button>
 
-        <Separator className="bg-white/10" />
-
-        {/* Change Password */}
-        <BlurFade delay={0.3}>
-          <Card className="surface border-white/10 rounded-2xl">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Lock className="h-4 w-4 text-amber-400" />
-                Change Password
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Input
-                type="password"
-                placeholder="Current password"
-                value={currentPw}
-                onChange={(e) => setCurrentPw(e.target.value)}
-                className="h-11 rounded-xl bg-white/5 border-white/10"
-              />
-              <Input
-                type="password"
-                placeholder="New password (min 8 chars)"
-                value={newPw}
-                onChange={(e) => setNewPw(e.target.value)}
-                className="h-11 rounded-xl bg-white/5 border-white/10"
-              />
-              <Button
-                onClick={handleChangePassword}
-                disabled={pending || !currentPw || newPw.length < 8}
-                variant="outline"
-                className="w-full rounded-xl border-white/10"
-              >
-                Update Password
-              </Button>
-            </CardContent>
-          </Card>
-        </BlurFade>
-
-        {/* Logout */}
-        <BlurFade delay={0.35}>
-          <form action={logout}>
-            <Button
-              type="submit"
-              variant="outline"
-              className="w-full h-12 rounded-xl border-destructive/50 text-destructive hover:bg-destructive/10"
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              Log Out
+        <div className="pt-5">
+          <Section icon={<Lock className="h-[18px] w-[18px]" />} tone="bg-push/15 text-push" title="Password">
+            <div className="space-y-2">
+              <Label htmlFor="settings-current-pw">Current password</Label>
+              <Input id="settings-current-pw" type="password" autoComplete="current-password" value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="settings-new-pw">New password</Label>
+              <Input id="settings-new-pw" type="password" autoComplete="new-password" value={newPw} onChange={(e) => setNewPw(e.target.value)} />
+              <p className="text-xs text-muted-foreground">At least 8 characters.</p>
+            </div>
+            <Button onClick={handleChangePassword} disabled={pending || !currentPw || newPw.length < 8} variant="outline" className="w-full">
+              Change password
             </Button>
-          </form>
-        </BlurFade>
+          </Section>
+        </div>
 
-        <p className="text-center text-xs text-muted-foreground pb-4">
-          Gym Ledger v0.1.0
-        </p>
+        <form action={logout} className="pt-3">
+          <Button type="submit" variant="outline" size="lg" className="w-full border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive">
+            <LogOut className="h-4 w-4" />
+            Log out
+          </Button>
+        </form>
+
+        <p className="pt-2 text-center text-xs text-muted-foreground">Gym Ledger v0.1.0</p>
       </div>
     </div>
   );

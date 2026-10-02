@@ -1,8 +1,8 @@
 import { count } from "drizzle-orm";
 import db from "@/lib/db";
 import { users, workouts, gymAttendance } from "@/lib/db/schema";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Dumbbell, CalendarCheck } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default async function AdminDashboard() {
   const [userCount] = await db.select({ value: count() }).from(users);
@@ -10,28 +10,25 @@ export default async function AdminDashboard() {
   const [attendanceCount] = await db.select({ value: count() }).from(gymAttendance);
 
   const stats = [
-    { label: "Total Users", value: userCount.value, icon: Users, color: "text-primary" },
-    { label: "Total Workouts", value: workoutCount.value, icon: Dumbbell, color: "text-primary" },
-    { label: "Total Check-ins", value: attendanceCount.value, icon: CalendarCheck, color: "text-emerald-400" },
+    { label: "Users", value: userCount.value, icon: Users, tone: "bg-pull/15 text-pull" },
+    { label: "Workouts logged", value: workoutCount.value, icon: Dumbbell, tone: "bg-push/15 text-push" },
+    { label: "Gym check-ins", value: attendanceCount.value, icon: CalendarCheck, tone: "bg-legs/15 text-legs" },
   ];
 
   return (
     <div>
-      <h1 className="text-2xl font-bold tracking-tight mb-6">Admin Dashboard</h1>
+      <h1 className="font-display text-[2rem] md:text-[2.5rem]">Dashboard</h1>
+      <p className="mt-1.5 text-sm text-muted-foreground">Activity across everyone on this server.</p>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="mt-6 grid gap-3 sm:grid-cols-3">
         {stats.map((stat) => (
-          <Card key={stat.label} className="surface rounded-2xl border-white/10">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {stat.label}
-              </CardTitle>
-              <stat.icon className={`h-5 w-5 ${stat.color}`} />
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold">{stat.value}</p>
-            </CardContent>
-          </Card>
+          <div key={stat.label} className="rounded-3xl bg-card p-5 shadow-soft dark:ring-1 dark:ring-white/5">
+            <span className={cn("flex h-10 w-10 items-center justify-center rounded-2xl", stat.tone)}>
+              <stat.icon className="h-5 w-5" />
+            </span>
+            <p className="mt-4 text-sm text-muted-foreground">{stat.label}</p>
+            <p className="mt-1 font-display tabular text-4xl">{stat.value}</p>
+          </div>
         ))}
       </div>
     </div>

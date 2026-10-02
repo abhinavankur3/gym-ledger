@@ -2,13 +2,13 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { LogIn, LogOut } from "lucide-react";
+import { MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { checkIn, checkOut } from "./actions";
 
-/** Compact check-in/out toggle for the dashboard stat row. */
-export function CheckInTile({ checkInTime }: { checkInTime: string | null }) {
+/** Floating check-in/out card for the dashboard. */
+export function CheckInTile({ checkInTime, className }: { checkInTime: string | null; className?: string }) {
   const [pending, startTransition] = useTransition();
   const router = useRouter();
   const isCheckedIn = !!checkInTime;
@@ -24,25 +24,25 @@ export function CheckInTile({ checkInTime }: { checkInTime: string | null }) {
     });
   }
 
-  const Icon = isCheckedIn ? LogOut : LogIn;
   return (
     <button
       type="button"
       onClick={toggle}
       disabled={pending}
       aria-label={isCheckedIn ? "Check out of the gym" : "Check in to the gym"}
-      className={cn(
-        "rounded-2xl border bg-card p-3 text-left transition-colors hover:border-primary/40 disabled:opacity-60",
-        isCheckedIn ? "border-primary/40" : "border-border"
-      )}
+      className={cn("flex flex-col rounded-3xl bg-card p-4 text-left shadow-soft transition-transform active:scale-[0.98] disabled:opacity-60", className)}
     >
-      <Icon className="h-4 w-4 text-primary" />
-      <p className="mt-2 text-lg font-bold" suppressHydrationWarning>
-        {pending ? "…" : isCheckedIn ? new Date(checkInTime).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "Check in"}
-      </p>
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-        {isCheckedIn ? "Tap to check out" : "At the gym?"}
-      </p>
+      <span className={cn("flex h-10 w-10 items-center justify-center rounded-2xl", isCheckedIn ? "bg-legs text-ink" : "bg-legs/15 text-legs")}>
+        <MapPin className="h-5 w-5" />
+      </span>
+      <span className="mt-4 text-sm text-muted-foreground">{isCheckedIn ? "At the gym since" : "At the gym?"}</span>
+      <span className="mt-1 font-display text-2xl" suppressHydrationWarning>
+        {pending
+          ? "…"
+          : isCheckedIn
+            ? new Date(checkInTime).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+            : "Check in"}
+      </span>
     </button>
   );
 }

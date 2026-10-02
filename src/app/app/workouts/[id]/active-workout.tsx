@@ -3,12 +3,9 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { addSet, deleteSet, removeExerciseFromWorkout, completeWorkout } from "../actions";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ExercisePicker } from "@/components/exercise-picker";
-import { BlurFade } from "@/components/ui/blur-fade";
 import {
   Select,
   SelectContent,
@@ -17,25 +14,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { Plus, Trash2, Trophy, Check, CheckCircle, X, ArrowLeft } from "lucide-react";
+import { Plus, Trash2, Trophy, Check, X, ChevronLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { SessionHero } from "@/components/session-hero";
+import { MuscleChip } from "@/components/muscle-chip";
+import { sessionTone } from "@/lib/muscles";
 
-const MUSCLE_GROUP_COLORS: Record<string, string> = {
-  chest: "bg-rose-500/20 text-rose-400 border-rose-500/30",
-  back: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  shoulders: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-  biceps: "bg-violet-500/20 text-violet-400 border-violet-500/30",
-  triceps: "bg-violet-500/20 text-violet-400 border-violet-500/30",
-  quads: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-  hamstrings: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-  glutes: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-  calves: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-  core: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-  forearms: "bg-violet-500/20 text-violet-400 border-violet-500/30",
-  full_body: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
-};
+const TONE_ART = { push: "dumbbell", pull: "kettlebell", legs: "plate", sun: "kettlebell" } as const;
+const SET_TYPE_LABEL: Record<string, string> = { warmup: "Warm-up", working: "Working", dropset: "Drop set", failure: "To failure" };
 
 type Exercise = {
   id: number;
@@ -169,9 +157,9 @@ export function ActiveWorkout({
       });
 
       if (result?.isPr) {
-        toast.success("New PR! 🏆", { duration: 3000 });
+        toast.success("New personal record", { duration: 3000 });
       } else if (result?.success) {
-        toast.success("Set logged!");
+        toast.success("Set logged");
       }
 
       // Reset form for this exercise
@@ -207,7 +195,7 @@ export function ActiveWorkout({
   function handleComplete() {
     startTransition(async () => {
       await completeWorkout(workout.id);
-      toast.success("Workout complete!");
+      toast.success("Workout finished");
       router.push("/app/workouts");
     });
   }
@@ -260,52 +248,51 @@ export function ActiveWorkout({
     0
   ) ?? 0;
 
-  return (
-    <div className="mx-auto max-w-4xl px-4 pt-5 pb-24 sm:px-6 lg:px-10">
-      <BlurFade delay={0}>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <Link href="/app/workouts" className="mb-3 inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-3.5 w-3.5" /> Workouts
-            </Link>
-            <h1 className="text-3xl font-bold tracking-tight">{workout.name}</h1>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {new Date(workout.startedAt).toLocaleDateString(undefined, {
-                weekday: "short",
-                month: "short",
-                day: "numeric",
-              })}
-              {isCompleted && " · Completed"}
-            </p>
-          </div>
-          {!isCompleted && (
-            <Button
-              onClick={handleComplete}
-              disabled={pending || loggedExerciseIds.length === 0}
-              size="sm"
-              className="rounded-xl bg-primary px-4 font-bold text-primary-foreground hover:bg-primary/90 gap-1.5"
-            >
-              <CheckCircle className="h-4 w-4" />
-              Finish
-            </Button>
-          )}
-        </div>
-      </BlurFade>
+  const tone = sessionTone([
+    ...(templateExercises ?? []).map((t) => t.primaryMuscleGroup),
+    ...loggedExerciseIds.map((id) => exerciseMap[id]?.primaryMuscleGroup).filter((m): m is string => !!m),
+  ]);
+  const dateLabel = new Date(workout.startedAt).toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  });
 
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:max-w-md">
-        <div className="rounded-2xl border border-border bg-card px-4 py-3">
-          <p className="text-2xl font-bold">{loggedSetCount}</p>
-          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Sets logged</p>
-        </div>
-        <div className="rounded-2xl border border-border bg-card px-4 py-3">
-          <p className="text-2xl font-bold">{plannedSetCount || "—"}</p>
-          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Target sets</p>
-        </div>
+  return (
+    <main className="pb-6">
+      <div className="flex items-center justify-between pt-6 pb-4 md:pt-10">
+        <Link href="/app/workouts" className="-ml-2 inline-flex h-10 items-center gap-0.5 rounded-xl pr-3 pl-1 text-sm font-semibold text-muted-foreground hover:text-foreground">
+          <ChevronLeft className="h-5 w-5" /> Training log
+        </Link>
+        {!isCompleted && (
+          <Button onClick={handleComplete} disabled={pending || loggedExerciseIds.length === 0}>
+            <Check className="h-4 w-4" /> Finish
+          </Button>
+        )}
       </div>
+
+      <SessionHero
+        tone={tone}
+        kicker={isCompleted ? `Finished, ${dateLabel}` : dateLabel}
+        title={workout.name}
+        art={TONE_ART[tone]}
+        meta={isCompleted ? "Completed" : "In progress"}
+      />
+
+      <dl className="mt-16 grid grid-cols-2 gap-3">
+        <div className="rounded-3xl bg-card p-4 shadow-soft dark:ring-1 dark:ring-white/5">
+          <dt className="text-sm text-muted-foreground">Sets logged</dt>
+          <dd className="mt-1 font-display tabular text-4xl">{loggedSetCount}</dd>
+        </div>
+        <div className="rounded-3xl bg-card p-4 shadow-soft dark:ring-1 dark:ring-white/5">
+          <dt className="text-sm text-muted-foreground">Target sets</dt>
+          <dd className="mt-1 font-display tabular text-4xl">{plannedSetCount || "—"}</dd>
+        </div>
+      </dl>
 
       {/* Exercise sections */}
       <div className="mt-6 space-y-4">
-        {allDisplayIds.map((exerciseId, i) => {
+        {allDisplayIds.map((exerciseId) => {
           const exercise = exerciseMap[exerciseId] ?? allExercises.find((e) => e.id === exerciseId);
           const sets = setsByExercise[exerciseId] || [];
           const isGhost = !loggedExerciseIds.includes(exerciseId);
@@ -319,256 +306,184 @@ export function ActiveWorkout({
             exercise?.primaryMuscleGroup ??
             ghostData?.primaryMuscleGroup ??
             "";
+          const exerciseCategory = exercise?.category ?? ghostData?.primaryMuscleGroup ?? "";
+          const isDuration = isDurationExercise(exerciseCategory, displayName);
+          const draft = getNewSet(exerciseId);
 
           return (
-            <BlurFade key={exerciseId} delay={0.05 * (i + 1)}>
-              <Card
-                className={cn(
-                  "surface rounded-3xl",
-                  isGhost
-                    ? "border-dashed border-border/70"
-                    : "border-border"
+            <section
+              key={exerciseId}
+              aria-label={displayName}
+              className={cn(
+                "rounded-3xl bg-card p-5 shadow-soft dark:ring-1 dark:ring-white/5",
+                isGhost && sets.length === 0 && "border-2 border-dashed border-border shadow-none"
+              )}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <h2 className="font-display text-xl leading-tight">{displayName}</h2>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {displayMuscle && <MuscleChip muscle={displayMuscle} />}
+                    {isGhost && ghostData && (
+                      <span className="text-sm text-muted-foreground">
+                        Target {ghostData.targetSets ?? 3} × {ghostData.targetReps ?? "?"}
+                        {ghostData.targetWeight ? ` at ${ghostData.targetWeight} kg` : ""}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {!isCompleted && (
+                  <button
+                    type="button"
+                    onClick={() => setRemoveExerciseId(exerciseId)}
+                    disabled={pending}
+                    aria-label={`Remove ${displayName} from workout`}
+                    className="-mr-2 -mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
                 )}
-              >
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between gap-2">
-                  <CardTitle className="flex-1 min-w-0 truncate text-lg">
-                      {displayName}
-                      {isGhost && (
-                        <span className="text-xs text-muted-foreground ml-2">
-                          (planned)
-                        </span>
+              </div>
+
+              {/* Logged sets */}
+              {sets.length > 0 && (
+                <ol className="mt-4 space-y-2">
+                  {sets.map((set) => (
+                    <li
+                      key={set.id}
+                      className={cn(
+                        "flex items-center gap-3 rounded-2xl px-3 py-2.5",
+                        set.isPr ? "bg-sun/25 ring-1 ring-sun" : "bg-muted/60"
                       )}
-                    </CardTitle>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {displayMuscle && (
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "text-[9px]",
-                            MUSCLE_GROUP_COLORS[displayMuscle]
+                    >
+                      <span
+                        aria-label={`Set ${set.setNumber}`}
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-legs text-sm font-bold text-ink"
+                      >
+                        {set.setNumber}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-baseline gap-1.5 font-display tabular text-2xl">
+                          {isDuration ? (
+                            set.durationSeconds ? formatDurationDisplay(set.durationSeconds) : "—"
+                          ) : (
+                            <>
+                              {set.weight ?? "—"}
+                              <span className="font-sans text-sm font-medium text-muted-foreground">kg</span>
+                              <span className="font-sans text-base text-muted-foreground">×</span>
+                              {set.reps ?? "—"}
+                            </>
                           )}
-                        >
-                          {displayMuscle.replace("_", " ")}
-                        </Badge>
+                        </span>
+                        <span className="text-xs text-muted-foreground">{SET_TYPE_LABEL[set.setType] ?? set.setType}</span>
+                      </span>
+                      {set.isPr && (
+                        <span className="inline-flex h-7 items-center gap-1 rounded-full bg-sun px-2.5 text-xs font-bold text-ink">
+                          <Trophy className="h-3.5 w-3.5" /> PR
+                        </span>
                       )}
                       {!isCompleted && (
                         <button
                           type="button"
-                          onClick={() => setRemoveExerciseId(exerciseId)}
+                          onClick={() => handleDeleteSet(set.id)}
+                          aria-label={`Delete set ${set.setNumber}`}
+                          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-background hover:text-destructive"
                           disabled={pending}
-                          aria-label="Remove exercise from workout"
-                          className="-mr-2 flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground hover:text-destructive transition-colors"
                         >
-                          <X className="h-4 w-4" />
+                          <Trash2 className="h-4 w-4" />
                         </button>
                       )}
+                    </li>
+                  ))}
+                </ol>
+              )}
+
+              {/* Add set */}
+              {!isCompleted && (
+                <div className="mt-4 rounded-2xl bg-muted/40 p-3">
+                  <p className="mb-2 text-sm font-semibold">Set {sets.length + 1}</p>
+                  {isDuration ? (
+                    <Input
+                      type="number"
+                      inputMode="decimal"
+                      placeholder="Minutes"
+                      aria-label={`Minutes for set ${sets.length + 1}`}
+                      value={draft.duration}
+                      onChange={(e) => updateNewSet(exerciseId, "duration", e.target.value)}
+                    />
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        placeholder="Weight (kg)"
+                        aria-label={`Weight in kg for set ${sets.length + 1}`}
+                        value={draft.weight}
+                        onChange={(e) => updateNewSet(exerciseId, "weight", e.target.value)}
+                        className="tabular"
+                      />
+                      <Input
+                        type="number"
+                        inputMode="numeric"
+                        placeholder="Reps"
+                        aria-label={`Reps for set ${sets.length + 1}`}
+                        value={draft.reps}
+                        onChange={(e) => updateNewSet(exerciseId, "reps", e.target.value)}
+                        className="tabular"
+                      />
                     </div>
-                  </div>
-                  {isGhost && ghostData && (
-                    <p className="text-[10px] text-muted-foreground mt-1">
-                      Target: {ghostData.targetSets ?? 3} sets x{" "}
-                      {ghostData.targetReps ?? "?"} reps
-                      {ghostData.targetWeight
-                        ? ` @ ${ghostData.targetWeight}kg`
-                        : ""}
-                    </p>
                   )}
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {(() => {
-                    const exerciseCategory = exercise?.category ?? ghostData?.primaryMuscleGroup ?? "";
-                    const isDuration = isDurationExercise(exerciseCategory, displayName);
-
-                    return (
-                      <>
-                        {/* Set headers */}
-                        {sets.length > 0 && (
-                          <div className={cn(
-                            "grid gap-2 px-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground",
-                            isDuration
-                              ? "grid-cols-[2rem_1fr_1fr_2rem]"
-                              : "grid-cols-[2rem_1fr_1fr_1fr_2rem]"
-                          )}>
-                            <span>Set</span>
-                            {isDuration ? (
-                              <>
-                                <span>Duration</span>
-                                <span>Type</span>
-                              </>
-                            ) : (
-                              <>
-                                <span>Weight</span>
-                                <span>Reps</span>
-                                <span>Type</span>
-                              </>
-                            )}
-                            <span />
-                          </div>
-                        )}
-
-                        {/* Logged sets */}
-                        {sets.map((set) => (
-                          <div
-                            key={set.id}
-                            className={cn(
-                              "grid items-center gap-2 rounded-xl px-2 py-2 text-sm",
-                              isDuration
-                                ? "grid-cols-[2rem_1fr_1fr_2rem]"
-                                : "grid-cols-[2rem_1fr_1fr_1fr_2rem]",
-                              set.isPr && "border border-primary/25 bg-primary/10"
-                            )}
-                          >
-                            <span className="text-muted-foreground text-xs">
-                              {set.setNumber}
-                            </span>
-                            {isDuration ? (
-                              <>
-                                <span className="font-medium">
-                                  {set.durationSeconds
-                                    ? formatDurationDisplay(set.durationSeconds)
-                                    : "—"}
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                  {set.setType}
-                                </span>
-                              </>
-                            ) : (
-                              <>
-                                <span className="font-medium">
-                                  {set.weight ?? "—"}
-                                </span>
-                                <span className="font-medium">{set.reps ?? "—"}</span>
-                                <span className="text-xs text-muted-foreground">
-                                  {set.setType}
-                                  {set.isPr && (
-                                    <Trophy className="inline ml-1 h-3 w-3 text-amber-400" />
-                                  )}
-                                </span>
-                              </>
-                            )}
-                            {!isCompleted && (
-                              <button
-                                onClick={() => handleDeleteSet(set.id)}
-                                className="text-muted-foreground hover:text-destructive transition-colors"
-                                disabled={pending}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </button>
-                            )}
-                          </div>
-                        ))}
-
-                        {/* Add set row */}
-                        {!isCompleted && (
-                          <div className={cn(
-                            "gap-2 items-center pt-1 grid",
-                            isDuration
-                              ? "grid-cols-[2rem_1fr_1fr_2rem]"
-                              : "grid-cols-[2rem_1fr_1fr_1fr_2rem]"
-                          )}>
-                            <span className="text-muted-foreground text-xs">
-                              {sets.length + 1}
-                            </span>
-                            {isDuration ? (
-                              <>
-                                <Input
-                                  type="number"
-                                  inputMode="decimal"
-                                  placeholder="min"
-                                  value={getNewSet(exerciseId).duration}
-                                  onChange={(e) =>
-                                    updateNewSet(exerciseId, "duration", e.target.value)
-                                  }
-                                  className="h-10 rounded-xl border-border bg-background text-sm"
-                                />
-                                <Select
-                                  value={getNewSet(exerciseId).setType}
-                                  onValueChange={(v) => {
-                                    if (!v) return;
-                                    updateNewSet(exerciseId, "setType", v);
-                                  }}
-                                >
-                                    <SelectTrigger className="h-10 rounded-xl border-border bg-background text-xs">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="working">Working</SelectItem>
-                                    <SelectItem value="warmup">Warmup</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </>
-                            ) : (
-                              <>
-                                <Input
-                                  type="number"
-                                  inputMode="decimal"
-                                  placeholder="kg"
-                                  value={getNewSet(exerciseId).weight}
-                                  onChange={(e) =>
-                                    updateNewSet(exerciseId, "weight", e.target.value)
-                                  }
-                                  className="h-10 rounded-xl border-border bg-background text-sm"
-                                />
-                                <Input
-                                  type="number"
-                                  inputMode="numeric"
-                                  placeholder="reps"
-                                  value={getNewSet(exerciseId).reps}
-                                  onChange={(e) =>
-                                    updateNewSet(exerciseId, "reps", e.target.value)
-                                  }
-                                  className="h-10 rounded-xl border-border bg-background text-sm"
-                                />
-                                <Select
-                                  value={getNewSet(exerciseId).setType}
-                                  onValueChange={(v) => {
-                                    if (!v) return;
-                                    updateNewSet(exerciseId, "setType", v);
-                                  }}
-                                >
-                                  <SelectTrigger className="h-10 rounded-xl border-border bg-background text-xs">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="warmup">Warmup</SelectItem>
-                                    <SelectItem value="working">Working</SelectItem>
-                                    <SelectItem value="dropset">Drop</SelectItem>
-                                    <SelectItem value="failure">Failure</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </>
-                            )}
-                            <button
-                              onClick={() => handleAddSet(exerciseId)}
-                              disabled={pending}
-                              className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground"
-                            >
-                              <Check className="h-4 w-4" />
-                            </button>
-                          </div>
-                        )}
-                      </>
-                    );
-                  })()}
-                </CardContent>
-              </Card>
-            </BlurFade>
+                  <div className="mt-2 grid grid-cols-[1fr_auto] gap-2">
+                    <Select
+                      value={draft.setType}
+                      onValueChange={(v) => {
+                        if (!v) return;
+                        updateNewSet(exerciseId, "setType", v);
+                      }}
+                    >
+                      <SelectTrigger className="w-full" aria-label="Set type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="warmup">Warm-up</SelectItem>
+                        <SelectItem value="working">Working</SelectItem>
+                        {!isDuration && <SelectItem value="dropset">Drop set</SelectItem>}
+                        {!isDuration && <SelectItem value="failure">To failure</SelectItem>}
+                      </SelectContent>
+                    </Select>
+                    <Button onClick={() => handleAddSet(exerciseId)} disabled={pending} className="h-12">
+                      {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Log set
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </section>
           );
         })}
       </div>
 
+      {allDisplayIds.length === 0 && (
+        <p className="mt-6 rounded-3xl border-2 border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+          No exercises yet. Add the first one you’re about to do.
+        </p>
+      )}
+
       {/* Add Exercise */}
       {!isCompleted && (
-        <div className="mt-6">
+        <div className="mt-4 space-y-3">
           <Button
             variant="outline"
             onClick={() => setPickerOpen(true)}
-            className="h-12 w-full rounded-2xl border-dashed border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
+            className="h-14 w-full border-2 border-dashed shadow-none"
           >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Exercise
+            <Plus className="h-4 w-4" />
+            Add exercise
           </Button>
+          {loggedExerciseIds.length > 0 && (
+            <Button onClick={handleComplete} disabled={pending} size="lg" className="w-full">
+              <Check className="h-5 w-5" /> Finish workout
+            </Button>
+          )}
         </div>
       )}
 
@@ -588,6 +503,6 @@ export function ActiveWorkout({
         destructive
         onConfirm={() => removeExerciseId !== null && handleRemoveExercise(removeExerciseId)}
       />
-    </div>
+    </main>
   );
 }

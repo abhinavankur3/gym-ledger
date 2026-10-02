@@ -11,12 +11,17 @@ export default async function AdminUsersPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">Users</h1>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="font-display text-[2rem] md:text-[2.5rem]">Users</h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">{allUsers.length} {allUsers.length === 1 ? "account" : "accounts"}</p>
+        </div>
         <CreateUserDialog />
       </div>
 
-      <UserTable users={allUsers} />
+      <div className="mt-6">
+        <UserTable users={allUsers} />
+      </div>
     </div>
   );
 }

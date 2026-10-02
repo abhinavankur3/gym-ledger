@@ -1,79 +1,159 @@
-import { eq, and, gte, count, desc, sql } from "drizzle-orm";
+import { eq, and, gte, desc, sql } from "drizzle-orm";
 import Link from "next/link";
 import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/dal";
 import { gymAttendance, workouts, bodyMetrics, planDrafts } from "@/lib/db/schema";
-import { getNextTrainingDay, getTodayTemplate } from "./routines/actions";
+import { getRoutineWeek, getTodayTemplate } from "./routines/actions";
 import { CheckInTile } from "./attendance/check-in-tile";
+import { WeekBar } from "./week-bar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { getUserTimeZone, greetingForHour, localHour, startOfLocalDayIso } from "@/lib/dates";
-import { WEEKDAY_LABELS } from "@/lib/ai/plan-types";
-import { Apple, ArrowUpRight, ChevronRight, Dumbbell, Flame, MessageCircle, Moon, Scale, Sparkles } from "lucide-react";
+import { SessionHero } from "@/components/session-hero";
+import { FactTable } from "@/components/fact-table";
+import { ProfileButton } from "@/components/layout/page-header";
+import { sessionTone } from "@/lib/muscles";
+import {
+  formatLocalLongDate,
+  getUserTimeZone,
+  greetingForHour,
+  localHour,
+  localWeekday,
+  startOfLocalDayIso,
+  startOfLocalWeekIso,
+} from "@/lib/dates";
+import { ChevronRight, Scale, Sparkles } from "lucide-react";
+
+const WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const TONE_ART = { push: "dumbbell", pull: "kettlebell", legs: "plate", sun: "kettlebell" } as const;
 
 export default async function AppDashboard() {
   const user = await getCurrentUser();
   const tz = await getUserTimeZone();
   const now = new Date();
-  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const today = localWeekday(now, tz);
 
-  const [activeCheckIn, weekWorkouts, latestWeight, todayTemplate, nextDay, pendingPlan] = await Promise.all([
+  const [activeCheckIn, weekWorkouts, latestWeight, todayTemplate, routineWeek, pendingPlan] = await Promise.all([
     db.query.gymAttendance.findFirst({ where: and(eq(gymAttendance.userId, user.id), gte(gymAttendance.checkIn, startOfLocalDayIso(now, tz)), sql`${gymAttendance.checkOut} IS NULL`) }),
-    db.select({ value: count() }).from(workouts).where(and(eq(workouts.userId, user.id), gte(workouts.startedAt, weekAgo))),
+    db.query.workouts.findMany({ where: and(eq(workouts.userId, user.id), gte(workouts.startedAt, startOfLocalWeekIso(now, tz))), columns: { startedAt: true } }),
     db.query.bodyMetrics.findFirst({ where: and(eq(bodyMetrics.userId, user.id), eq(bodyMetrics.metricType, "weight")), orderBy: [desc(bodyMetrics.date)] }),
     getTodayTemplate(),
-    getNextTrainingDay(),
+    getRoutineWeek(),
     db.query.planDrafts.findFirst({ where: eq(planDrafts.userId, user.id), columns: { id: true } }),
   ]);
 
-  const workoutCount = weekWorkouts[0]?.value ?? 0;
+  const doneDays = [...new Set(weekWorkouts.map((w) => localWeekday(new Date(w.startedAt), tz)))];
+  const plannedDays = routineWeek.map((d) => d.dayOfWeek);
+  const nextDay = routineWeek.find((d) => d.dayOfWeek > today) ?? routineWeek[0];
+  const nextInDays = nextDay ? ((nextDay.dayOfWeek - today + 7) % 7 || 7) : null;
+  const trainedToday = doneDays.includes(today);
   const workoutHref = todayTemplate ? `/app/workouts/new?templateId=${todayTemplate.id}` : "/app/workouts/new";
-  const isRestDay = !todayTemplate && !!nextDay;
-  const insight = coachInsight({ workoutCount, hasWeight: !!latestWeight, isRestDay, pendingPlan: !!pendingPlan });
+  const firstName = user.name.split(" ")[0];
+  const note = coachNote({ sessions: doneDays.length, planned: plannedDays.length, hasWeight: !!latestWeight, trainedToday });
+  const tone = todayTemplate ? sessionTone(todayTemplate.exercises.map((e) => e.primaryMuscleGroup)) : "sun";
 
   return (
-    <main className="px-4 pt-8">
-      <header className="flex items-start justify-between">
-        <div><p className="text-sm font-medium text-muted-foreground">{greetingForHour(localHour(now, tz))}</p><h1 className="mt-1 text-3xl font-bold tracking-tight">{user.name}</h1></div>
-        <Link href="/app/settings" aria-label="Open settings" className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card text-sm font-bold text-primary">{user.name.slice(0, 1).toUpperCase()}</Link>
+    <main className="pb-6">
+      <header className="flex items-center justify-between gap-4 pt-6 md:pt-10">
+        <div>
+          <p className="text-sm text-muted-foreground">{greetingForHour(localHour(now, tz))},</p>
+          <h1 className="font-display text-[2rem]">{firstName}</h1>
+        </div>
+        <ProfileButton initial={user.name.slice(0, 1).toUpperCase()} />
       </header>
 
-      {pendingPlan && <Link href="/app/plan" className="mt-6 block"><Card className="rounded-3xl border-primary/25 bg-primary/5"><CardContent className="flex items-center gap-3 p-4"><div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/12"><Sparkles className="h-5 w-5 text-primary" /></div><div className="min-w-0 flex-1"><p className="font-bold">Your plan is ready to review</p><p className="mt-0.5 text-xs text-muted-foreground">Confirm it or add a note to regenerate.</p></div><ArrowUpRight className="h-4 w-4 text-primary" /></CardContent></Card></Link>}
+      {pendingPlan && (
+        <Link href="/app/plan" className="mt-5 flex items-center gap-3 rounded-3xl bg-card p-4 shadow-soft">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sun text-ink"><Sparkles className="h-5 w-5" /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Your plan is ready to review</span>
+            <span className="mt-0.5 block text-sm text-muted-foreground">Confirm it, or ask for changes.</span>
+          </span>
+          <ChevronRight className="h-5 w-5 text-muted-foreground" />
+        </Link>
+      )}
 
-      <section className="mt-8">
-        <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-primary">Today</p>
-        <Card className="overflow-hidden rounded-3xl border-primary/20 bg-primary text-primary-foreground shadow-lg shadow-primary/10"><CardContent className="p-5">
-          {todayTemplate ? (
-            <><div className="flex items-start justify-between gap-4"><div><p className="text-sm text-primary-foreground/70">Today&apos;s workout</p><p className="mt-1 text-2xl font-bold">{todayTemplate.name}</p></div><div className="rounded-2xl bg-primary-foreground/15 p-3"><Dumbbell className="h-6 w-6" /></div></div><p className="mt-4 text-sm text-primary-foreground/75">{todayTemplate.exercises.length} exercises · Ready when you are</p></>
-          ) : isRestDay ? (
-            <><div className="flex items-start justify-between gap-4"><div><p className="text-sm text-primary-foreground/70">Rest day</p><p className="mt-1 text-2xl font-bold">Recover well.</p></div><div className="rounded-2xl bg-primary-foreground/15 p-3"><Moon className="h-6 w-6" /></div></div><p className="mt-4 text-sm text-primary-foreground/75">Next up: {nextDay.name} {nextDay.inDays === 1 ? "tomorrow" : `on ${WEEKDAY_LABELS[nextDay.dayOfWeek]}`}</p></>
-          ) : (
-            <><p className="text-2xl font-bold">Make today count.</p><p className="mt-2 max-w-[18rem] text-sm text-primary-foreground/75">Start a workout and your coach will help you build momentum from there.</p></>
+      {/* Today */}
+      <section aria-label="Today" className="mt-6">
+        {todayTemplate ? (
+          <SessionHero
+            tone={tone}
+            kicker={trainedToday ? "Done for today" : `Today, ${formatLocalLongDate(now, tz).split(",")[0]}`}
+            title={todayTemplate.name}
+            art={TONE_ART[tone]}
+            meta={`${todayTemplate.exercises.length} exercises`}
+          />
+        ) : nextDay ? (
+          <SessionHero tone="sun" kicker="Rest day" title="Recover" watermark="Rest" art="plate" meta={`Next: ${nextDay.name}, ${nextInDays === 1 ? "tomorrow" : WEEKDAY_NAMES[nextDay.dayOfWeek]}`} />
+        ) : (
+          <SessionHero tone="sun" kicker={formatLocalLongDate(now, tz)} title="Open session" watermark="Train" art="kettlebell" meta="No plan scheduled today" />
+        )}
+
+        <div className="mt-16">
+          {todayTemplate && (
+            <>
+              <h2 className="font-display text-xl">Session plan</h2>
+              <FactTable
+                className="mt-3"
+                rows={todayTemplate.exercises.slice(0, 5).map((exercise, index) => ({
+                  key: `${exercise.exerciseId}-${index}`,
+                  label: exercise.name,
+                  value: exercise.targetSets ? `${exercise.targetSets} × ${exercise.targetReps}` : "—",
+                }))}
+              />
+              {todayTemplate.exercises.length > 5 && <p className="mt-2 text-sm text-muted-foreground">and {todayTemplate.exercises.length - 5} more</p>}
+            </>
           )}
-          <Link href={workoutHref} className="mt-5 block"><Button className="h-12 w-full rounded-2xl bg-background font-bold text-foreground hover:bg-background/90">{isRestDay ? "Train anyway" : "Start workout"} <ArrowUpRight className="ml-2 h-4 w-4" /></Button></Link>
-        </CardContent></Card>
+          <Link href={workoutHref} className="mt-5 block">
+            <Button className="h-14 w-full rounded-2xl text-base font-semibold shadow-glow">
+              {todayTemplate ? (trainedToday ? "Log another session" : `Start ${todayTemplate.name}`) : "Log a workout"}
+            </Button>
+          </Link>
+        </div>
       </section>
 
-      <section className="mt-5 grid grid-cols-3 gap-2.5">
-        <Link href="/app/workouts"><Stat icon={<Flame className="h-4 w-4" />} value={String(workoutCount)} label="Last 7 days" /></Link>
-        <Link href="/app/metrics" aria-label={latestWeight ? "View body metrics" : "Log your weight"}><Stat icon={<Scale className="h-4 w-4" />} value={latestWeight ? latestWeight.value.toFixed(1) : "Log"} label={latestWeight ? latestWeight.unit : "Weight"} /></Link>
+      {/* Floating stat cards */}
+      <section aria-label="Quick stats" className="mt-8 grid grid-cols-2 gap-3">
+        <Link href="/app/metrics" className="flex flex-col rounded-3xl bg-card p-4 shadow-soft">
+          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-pull/15 text-pull"><Scale className="h-5 w-5" /></span>
+          <span className="mt-4 text-sm text-muted-foreground">Body weight</span>
+          {latestWeight ? (
+            <span className="mt-1 flex items-baseline gap-1">
+              <span className="font-display tabular text-3xl">{latestWeight.value.toFixed(1)}</span>
+              <span className="text-sm text-muted-foreground">{latestWeight.unit}</span>
+            </span>
+          ) : (
+            <span className="mt-1 font-display text-2xl">Log weight</span>
+          )}
+        </Link>
         <CheckInTile checkInTime={activeCheckIn?.checkIn ?? null} />
       </section>
 
-      <section className="mt-8"><div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-bold">Keep the loop going</h2><Link href="/app/progress" className="text-sm font-semibold text-primary">See progress</Link></div><div className="space-y-2.5"><Link href="/app/nutrition" className="block"><ActionRow icon={<Apple className="h-5 w-5 text-primary" />} title="Log what you eat" detail="Nutrition tracking is coming next" /></Link><Link href="/app/coach" className="block"><ActionRow icon={<MessageCircle className="h-5 w-5 text-primary" />} title="Talk to your coach" detail="Get context on your progress" /></Link></div></section>
+      {/* The week */}
+      <section aria-labelledby="week-heading" className="mt-3 rounded-3xl bg-card p-5 shadow-soft">
+        <div className="flex items-baseline justify-between">
+          <h2 id="week-heading" className="font-display text-xl">This week</h2>
+          <Link href="/app/workouts" className="text-sm font-semibold text-primary hover:underline">History</Link>
+        </div>
+        <div className="mt-2">
+          <WeekBar doneDays={doneDays} plannedDays={plannedDays} today={today} />
+        </div>
+      </section>
 
-      <section className="mt-8 mb-3 rounded-3xl border border-border bg-card p-5"><div className="flex items-center gap-2 text-primary"><Sparkles className="h-4 w-4" /><p className="text-xs font-bold uppercase tracking-[0.14em]">Coach insight</p></div><p className="mt-3 text-base font-semibold leading-6">{insight.text}</p><Link href={insight.href} className="mt-4 inline-flex items-center text-sm font-bold text-primary">{insight.cta} <ChevronRight className="ml-1 h-4 w-4" /></Link></section>
+      {/* Coach note */}
+      <section aria-labelledby="coach-heading" className="mt-3 rounded-3xl bg-ink p-5 text-white shadow-soft dark:bg-card">
+        <h2 id="coach-heading" className="font-display text-xl">From your coach</h2>
+        <p className="mt-2 text-[1.0625rem] leading-7 text-white/85">{note.text}</p>
+        <Link href={note.href} className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-sun hover:underline">
+          {note.cta} <ChevronRight className="h-4 w-4" />
+        </Link>
+      </section>
     </main>
   );
 }
 
-function coachInsight({ workoutCount, hasWeight, isRestDay, pendingPlan }: { workoutCount: number; hasWeight: boolean; isRestDay: boolean; pendingPlan: boolean }) {
-  if (pendingPlan) return { text: "Your first plan is drafted. Give it a quick look and lock it in so each day has a clear session.", href: "/app/plan", cta: "Review your plan" };
-  if (workoutCount === 0) return { text: "Small, consistent sessions beat perfect plans. Log one workout this week and let the data guide what comes next.", href: "/app/workouts/new", cta: "Log a workout" };
-  if (!hasWeight) return { text: `${workoutCount} session${workoutCount === 1 ? "" : "s"} in the last week. Add a body-weight entry so progress isn't measured on lifts alone.`, href: "/app/metrics", cta: "Log your weight" };
-  if (isRestDay) return { text: `${workoutCount} session${workoutCount === 1 ? "" : "s"} in the last week. Rest days are when the adaptation happens — sleep and protein matter today.`, href: "/app/progress", cta: "See your progress" };
-  return { text: `${workoutCount} session${workoutCount === 1 ? "" : "s"} in the last week. Keep stacking them — consistency is what moves the numbers.`, href: "/app/progress", cta: "See your progress" };
+function coachNote({ sessions, planned, hasWeight, trainedToday }: { sessions: number; planned: number; hasWeight: boolean; trainedToday: boolean }) {
+  if (sessions === 0) return { text: "A new week starts empty. One logged session gives us something to build on, so make the first one easy to finish.", href: "/app/workouts/new", cta: "Log a workout" };
+  if (!hasWeight) return { text: "Your training log is filling up. Add a body-weight entry so progress isn’t judged on lifts alone.", href: "/app/metrics", cta: "Log your weight" };
+  if (planned && sessions >= planned) return { text: "Every planned session is in for this week. Extra work is optional; sleep and protein will do more for you now.", href: "/app/progress", cta: "See your progress" };
+  if (trainedToday) return { text: "Session logged. The next one matters more than squeezing in another today.", href: "/app/progress", cta: "See your progress" };
+  return { text: `${sessions} session${sessions === 1 ? "" : "s"} so far this week. Keep the rhythm and the numbers will follow.`, href: "/app/progress", cta: "See your progress" };
 }
-
-function Stat({ icon, value, label }: { icon: React.ReactNode; value: string; label: string }) { return <Card className="h-full rounded-2xl border-border bg-card transition-colors hover:border-primary/40"><CardContent className="p-3"><div className="text-primary">{icon}</div><p className="mt-2 text-lg font-bold">{value}</p><p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p></CardContent></Card>; }
-function ActionRow({ icon, title, detail }: { icon: React.ReactNode; title: string; detail: string }) { return <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 transition-colors hover:border-primary/40"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">{icon}</div><div className="min-w-0 flex-1"><p className="font-bold">{title}</p><p className="mt-0.5 truncate text-xs text-muted-foreground">{detail}</p></div><ChevronRight className="h-4 w-4 text-muted-foreground" /></div>; }

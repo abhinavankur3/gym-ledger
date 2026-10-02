@@ -13,7 +13,7 @@ export default async function AdminLayout({
     <div className="flex min-h-screen flex-col md:flex-row">
       <AdminMobileNav />
       <AdminSidebar />
-      <main className="flex-1 p-4 md:p-8">{children}</main>
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-3 pb-10 sm:px-6 md:pt-10">{children}</main>
     </div>
   );
 }
