@@ -35,10 +35,7 @@ export default async function LandingPage() {
         {/* Hero */}
         <section className="mx-auto grid w-full max-w-6xl items-center gap-14 px-5 pt-8 pb-20 sm:px-8 lg:grid-cols-[1.05fr_1fr] lg:pt-16">
           <div>
-            <p className="inline-flex items-center gap-2 rounded-full bg-card px-3 py-1.5 text-sm font-semibold shadow-soft">
-              <span className="h-2 w-2 rounded-full bg-legs" aria-hidden /> Kochi is Japanese for coach
-            </p>
-            <h1 className="mt-6 font-display text-[3.25rem] leading-[0.95] sm:text-7xl">
+            <h1 className="font-display text-[3.25rem] leading-[0.95] sm:text-7xl">
               Your coach for training and food<span className="text-primary">.</span>
             </h1>
             <p className="mt-6 max-w-xl text-lg leading-8 text-muted-foreground">
