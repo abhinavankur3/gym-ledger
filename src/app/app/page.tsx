@@ -25,7 +25,8 @@ import {
   startOfLocalDayIso,
   startOfLocalWeekIso,
 } from "@/lib/dates";
-import { ChevronRight, Dumbbell, Salad, Sparkles } from "lucide-react";
+import { ChevronRight, Dumbbell, Salad, Sparkles, TrendingUp } from "lucide-react";
+import { ensureWeeklyReview } from "@/lib/adaptive/weekly";
 import type { TodayLog } from "./nutrition/today-client";
 
 const WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -50,6 +51,9 @@ export default async function AppDashboard() {
     getNutritionState(),
     getIntake(),
   ]);
+  // First open of a new week builds last week's check-in (pure rules, no AI)
+  const review = await ensureWeeklyReview(user.id, tz);
+  const pendingChanges = review?.proposals.filter((p) => p.status === "pending").length ?? 0;
 
   // Only finished sessions count as done; an open one shows as "Resume" instead
   const doneDays = [...new Set(weekWorkouts.filter((w) => w.completedAt).map((w) => localWeekday(new Date(w.startedAt), tz)))];
@@ -114,6 +118,9 @@ export default async function AppDashboard() {
         )}
       </section>
 
+      {pendingChanges > 0 && (
+        <Banner href="/app/review" icon={<TrendingUp className="h-5 w-5" />} tone="bg-pull" title="Your weekly check-in is ready" detail={`Kochi suggests ${pendingChanges} change${pendingChanges === 1 ? "" : "s"} based on last week.`} />
+      )}
       {pendingPlan && (
         <Banner href="/app/plan" icon={<Sparkles className="h-5 w-5" />} tone="bg-sun" title="Your training plan is ready to review" detail="Confirm it, or ask for changes." />
       )}

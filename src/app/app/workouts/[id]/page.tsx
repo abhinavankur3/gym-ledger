@@ -8,11 +8,13 @@ import {
   exercises,
   workoutTemplates,
   workoutTemplateExercises,
+  userProfiles,
 } from "@/lib/db/schema";
 import { ActiveWorkout } from "./active-workout";
 import { getLastPerformance } from "../actions";
 import { visibleExercises } from "@/lib/exercises";
 import { getUserTimeZone } from "@/lib/dates";
+import { weekKey } from "@/lib/adaptive/weekly";
 
 export default async function WorkoutDetailPage({
   params,
@@ -96,6 +98,8 @@ export default async function WorkoutDetailPage({
     }
   }
 
+  const tz = await getUserTimeZone();
+  const profile = await db.query.userProfiles.findFirst({ where: eq(userProfiles.userId, user.id), columns: { deloadWeek: true } });
   const lastPerformance = await getLastPerformance(
     [...new Set([...exerciseIds, ...(templateExercises ?? []).map((t) => t.exerciseId)])],
     workout.id
@@ -109,7 +113,8 @@ export default async function WorkoutDetailPage({
       allExercises={allExercises}
       templateExercises={templateExercises}
       lastPerformance={lastPerformance}
-      dateLabel={new Intl.DateTimeFormat("en-GB", { timeZone: await getUserTimeZone(), weekday: "long", day: "numeric", month: "short" }).format(new Date(workout.startedAt))}
+      dateLabel={new Intl.DateTimeFormat("en-GB", { timeZone: tz, weekday: "long", day: "numeric", month: "short" }).format(new Date(workout.startedAt))}
+      deload={!!profile?.deloadWeek && profile.deloadWeek === weekKey(new Date(workout.startedAt), tz)}
     />
   );
 }

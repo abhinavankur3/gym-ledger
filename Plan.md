@@ -101,7 +101,7 @@ The natural-language layer over the structured data: explain why a workout chang
 | 5 Routine overhaul | Done, with "Your plan" at `/app/plan` (view, change via feedback, update answers). Legacy detail/editor routes were deleted rather than kept |
 | 6 Workout logging | Done: Home starts/resumes the session directly, prefilled sets, one-tap completion, rest timer, set-level progressive overload |
 | 7 Nutrition | Targets, AI meal plans with protein-shake top-up and Jev selection, and logging (plan, photo, text) done; photo benchmark pending |
-| 8 Adaptive progression | Only per-set weight/rep suggestions |
+| 8 Adaptive progression | Weekly check-in with rule-based proposals (days, session length, lighter week, calories) and a decision log; per-set progression |
 | 9 Queues | Deferred, as planned |
 | 10 Coach | Placeholder only |
 
@@ -129,10 +129,14 @@ Each phase ends with a commit.
 - Today's intake against targets, and a 7-day history.
 - Still to do: benchmark photo accuracy on 30–50 real regional meals (first test: a masala dosa was read as a plain dosa, so the potato filling was missed).
 
-### Phase 3 — adaptive engine (rules, not AI)
-- Weekly review of adherence, missed sessions, lift trends, body-weight trend, meal adherence and feedback.
-- Proposes changes with reasons (volume, targets, swaps, duration, deload, calories/macros); the user accepts on a "This week's changes" card; every change is logged.
-- Runs on first app open of a new week; no queue required.
+### Phase 3 — adaptive engine (rules, not AI) ✅
+- Weekly check-in built on the first app open of a new week (no queue), from last week's finished sessions, share of planned sets logged, stalled lifts, weigh-ins, logged meals and records.
+- Proposals, each with its reason, accepted or declined on /app/review (Home shows a banner); decisions stored on the review as the change log:
+  - Missed 2+ sessions two weeks running → one fewer training day (drafts a new plan to review).
+  - Sessions ending early (<70% of planned sets) → 15 minutes shorter (drafts a new plan).
+  - 3+ lifts stalled for three sessions → lighter week (about 10% off weights, one fewer set), at most every 5 weeks.
+  - Weight trend outside the goal's healthy rate (≥4 weigh-ins over 7+ days) → calorie target ± (step ≤250, total ≤±600, never below the safety floor); no change when intake is far from target.
+- Thin data produces notes asking for weigh-ins and meal logs instead of guesses.
 
 ### Phase 4 — Kochi coach
 - Chat grounded in the user's data: explains changes from the Phase 3 log, summarises progress, answers training/meal questions, helps after missed sessions.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { needsInput, parseRepRange, suggestSet, weightIncrement } from "./set-suggestions";
+import { deloadSets, deloadSuggestion, needsInput, parseRepRange, suggestSet, weightIncrement } from "./set-suggestions";
 
 const S = (setNumber: number, weight: number | null, reps: number | null) => ({ setNumber, setType: "working", weight, reps, durationSeconds: null });
 const base = { kind: "weighted" as const, category: "barbell", targetReps: "8-12", targetWeight: null, doneThisWorkout: [], lastSession: [] };
@@ -62,5 +62,25 @@ describe("suggestSet", () => {
   it("uses seconds for timed exercises: plan number, else 60", () => {
     expect(suggestSet({ ...base, kind: "duration", category: "bodyweight", targetReps: "45", setIndex: 0 }).durationSeconds).toBe(45);
     expect(suggestSet({ ...base, kind: "duration", category: "cardio", targetReps: null, setIndex: 0 }).durationSeconds).toBe(60);
+  });
+});
+
+describe("deload", () => {
+  it("takes about 10% off history-based weights, rounded to the nearest step", () => {
+    expect(deloadSuggestion({ weight: 80, reps: 8, durationSeconds: null, from: "history" }, "barbell").weight).toBe(72.5);
+    expect(deloadSuggestion({ weight: 22, reps: 10, durationSeconds: null, from: "history" }, "dumbbell").weight).toBe(20);
+    // Light weights still drop by at least one step
+    expect(deloadSuggestion({ weight: 10, reps: 12, durationSeconds: null, from: "history" }, "dumbbell").weight).toBe(8);
+  });
+
+  it("never reduces a set copied from earlier in the same workout", () => {
+    const s = { weight: 72.5, reps: 8, durationSeconds: null, from: "workout" as const };
+    expect(deloadSuggestion(s, "barbell")).toBe(s);
+  });
+
+  it("leaves bodyweight and unknown weights alone, and drops one set (min 1)", () => {
+    const bw = { weight: null, reps: 12, durationSeconds: null, from: "history" as const };
+    expect(deloadSuggestion(bw, "bodyweight")).toBe(bw);
+    expect([deloadSets(3), deloadSets(1)]).toEqual([2, 1]);
   });
 });

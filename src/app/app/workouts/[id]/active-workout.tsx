@@ -23,6 +23,8 @@ import {
   type ExerciseKind,
   type PastSet,
   type Suggestion,
+  deloadSets,
+  deloadSuggestion,
 } from "@/lib/set-suggestions";
 
 const TONE_ART = { push: "dumbbell", pull: "kettlebell", legs: "plate", sun: "kettlebell" } as const;
@@ -85,6 +87,8 @@ type Props = {
   lastPerformance: Record<number, PastSet[]>;
   /** Session date formatted in the user's time zone on the server */
   dateLabel: string;
+  /** This workout falls in an accepted deload (lighter) week */
+  deload?: boolean;
 };
 
 function formatDuration(seconds: number) {
@@ -105,6 +109,7 @@ export function ActiveWorkout({
   templateExercises,
   lastPerformance: initialLastPerformance,
   dateLabel,
+  deload = false,
 }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -158,7 +163,8 @@ export function ActiveWorkout({
 
   function rowCount(exerciseId: number, done: DoneSet[]) {
     const { template } = exerciseInfo(exerciseId);
-    const planned = template?.targetSets ?? lastPerformance[exerciseId]?.length ?? DEFAULT_SET_COUNT;
+    const basePlanned = template?.targetSets ?? lastPerformance[exerciseId]?.length ?? DEFAULT_SET_COUNT;
+    const planned = deload ? deloadSets(basePlanned) : basePlanned;
     const highestDone = done.at(-1)?.setNumber ?? 0;
     if (isCompleted) return highestDone;
     return Math.max(planned, highestDone) + (extraRows[exerciseId] ?? 0);
@@ -168,7 +174,7 @@ export function ActiveWorkout({
     const key = `${exerciseId}:${setNumber}`;
     if (edits[key]) return edits[key];
     const { kind, category, template } = exerciseInfo(exerciseId);
-    return suggestSet({
+    const suggestion = suggestSet({
       setIndex: setNumber - 1,
       kind,
       category,
@@ -177,6 +183,7 @@ export function ActiveWorkout({
       doneThisWorkout: done.filter((s) => s.setNumber < setNumber && s.setType !== "warmup"),
       lastSession: lastPerformance[exerciseId] ?? [],
     });
+    return deload && kind === "weighted" ? deloadSuggestion(suggestion, category) : suggestion;
   }
 
   function logSet(exerciseId: number, setNumber: number, values: Suggestion) {
@@ -314,6 +321,11 @@ export function ActiveWorkout({
             <div className="h-full rounded-full bg-legs transition-[width] duration-300" style={{ width: `${Math.min(100, (doneRows / totalRows) * 100)}%` }} />
           </div>
           <p className="mt-2 text-sm text-muted-foreground">Tap the circle when a set is done. Tap the numbers to change them.</p>
+          {deload && (
+            <p className="mt-3 rounded-2xl bg-sun/25 px-4 py-3 text-sm">
+              <span className="font-semibold">Lighter week.</span> Weights are about 10% down and there&apos;s one fewer set per exercise, so you recover and come back stronger.
+            </p>
+          )}
         </div>
       )}
 

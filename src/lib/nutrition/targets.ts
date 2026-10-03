@@ -28,6 +28,8 @@ export type TargetInput = {
   sessionMinutes: number;
   /** Latest body-fat %, if the user logged one */
   bodyFatPercent?: number | null;
+  /** Correction learned by the weekly review from the real weight trend (kcal) */
+  kcalAdjustment?: number;
 };
 
 export type RmrMethod = "mifflin" | "ten-haaf" | "cunningham";
@@ -45,6 +47,7 @@ export type NutritionTargets = {
     training: number;
     maintenance: number;
     goalAdjustment: number;
+    adaptiveAdjustment: number;
     proteinPerKg: number;
   };
 };
@@ -115,7 +118,8 @@ export function computeTargets(input: TargetInput): NutritionTargets {
   const maintenance = dailyLife + training;
   const goalAdjustment = maintenance * GOAL_ADJUSTMENT[input.goal];
   // Never plan below resting energy or a 1,200 kcal floor
-  const kcal = round(Math.max(maintenance + goalAdjustment, rmr, 1200), 10);
+  const adaptiveAdjustment = input.kcalAdjustment ?? 0;
+  const kcal = round(Math.max(maintenance + goalAdjustment + adaptiveAdjustment, rmr, 1200), 10);
 
   // Protein on a reference weight for higher BMIs (weight at BMI 27), so targets stay realistic
   const heightM = input.heightCm / 100;
@@ -137,6 +141,7 @@ export function computeTargets(input: TargetInput): NutritionTargets {
       training: round(training),
       maintenance: round(maintenance),
       goalAdjustment: round(goalAdjustment),
+      adaptiveAdjustment,
       proteinPerKg,
     },
   };

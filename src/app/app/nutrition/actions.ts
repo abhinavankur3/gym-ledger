@@ -53,6 +53,7 @@ export async function getNutritionState() {
     trainingDays: profile.trainingDays,
     sessionMinutes: profile.sessionDuration,
     bodyFatPercent: bodyFat?.value ?? null,
+    kcalAdjustment: profile.kcalAdjustment,
   });
 
   const country = countryFromTimeZone(timeZone);

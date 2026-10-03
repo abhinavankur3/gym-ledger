@@ -67,6 +67,14 @@ describe("computeTargets", () => {
     expect(heavy.protein).toBe(Math.round(27 * 1.78 * 1.78 * 1.6));
   });
 
+  it("applies the weekly review's adjustment but keeps the safety floor", () => {
+    const plain = computeTargets(base).kcal;
+    expect(computeTargets({ ...base, kcalAdjustment: -150 }).kcal).toBe(plain - 150);
+    const floored = computeTargets({ ...base, sex: "female", weightKg: 48, heightCm: 152, age: 55, activityLevel: "sedentary", trainingDays: 0, goal: "lose_fat", kcalAdjustment: -600 });
+    expect(floored.kcal).toBeGreaterThanOrEqual(1200);
+    expect(floored.breakdown.adaptiveAdjustment).toBe(-600);
+  });
+
   it("macros add back up to the calorie target", () => {
     for (const goal of ["lose_fat", "build_muscle", "recomposition", "general_fitness"] as const) {
       const t = computeTargets({ ...base, goal });

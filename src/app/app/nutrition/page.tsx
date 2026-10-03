@@ -156,6 +156,7 @@ function TargetsCard({ targets, weightFromLog }: { targets: NutritionTargets; we
           <Row label="Training, averaged over the week" value={`${signed(b.training)} kcal`} />
           <Row label="Maintenance" value={`${b.maintenance} kcal`} />
           <Row label="For your goal" value={`${signed(b.goalAdjustment)} kcal`} />
+          {b.adaptiveAdjustment !== 0 && <Row label="From your weekly reviews" value={`${signed(b.adaptiveAdjustment)} kcal`} />}
           <Row label="Protein" value={`${b.proteinPerKg} g per kg`} />
         </dl>
         <p className="mt-3 text-xs leading-5 text-muted-foreground">

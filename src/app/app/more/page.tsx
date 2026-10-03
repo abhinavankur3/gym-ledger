@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookOpen, CalendarCheck, CalendarRange, ChevronRight, Scale, Settings } from "lucide-react";
+import { BookOpen, CalendarCheck, CalendarRange, ChevronRight, Scale, Settings, TrendingUp } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/dal";
 import { PageHeader } from "@/components/layout/page-header";
 import { cn } from "@/lib/utils";
@@ -7,7 +7,10 @@ import { cn } from "@/lib/utils";
 const sections = [
   {
     title: "Training",
-    items: [{ href: "/app/plan", label: "Your plan", detail: "Your week of sessions, and changes to it", icon: CalendarRange, tone: "bg-primary/12 text-primary" }],
+    items: [
+      { href: "/app/plan", label: "Your plan", detail: "Your week of sessions, and changes to it", icon: CalendarRange, tone: "bg-primary/12 text-primary" },
+      { href: "/app/review", label: "Weekly check-ins", detail: "What Kochi suggested and what you decided", icon: TrendingUp, tone: "bg-pull/15 text-pull" },
+    ],
   },
   {
     title: "Track",

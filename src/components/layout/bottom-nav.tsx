@@ -20,7 +20,7 @@ const navItems = [
   { href: "/app/progress", label: "Progress", icon: BarChart3, match: ["/app/progress", "/app/charts", "/app/metrics", "/app/attendance"] },
   { href: "/app/coach", label: "Coach", icon: MessageCircle, match: ["/app/coach"] },
   // Desktop rail only; on mobile, "More" is reached from the profile button in page headers.
-  { href: "/app/more", label: "More", icon: LayoutGrid, match: ["/app/more", "/app/exercises", "/app/settings"], desktopOnly: true },
+  { href: "/app/more", label: "More", icon: LayoutGrid, match: ["/app/more", "/app/exercises", "/app/settings", "/app/review"], desktopOnly: true },
 ];
 
 /** Floating tab bar on mobile; floating left rail from md up. */

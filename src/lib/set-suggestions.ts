@@ -18,6 +18,8 @@ export type Suggestion = {
   durationSeconds: number | null;
   /** Why the numbers differ from last time, e.g. "+2.5 kg from last time" */
   hint?: string;
+  /** Where the numbers came from: this workout's previous set, past history, or the plan */
+  from?: "workout" | "history" | "plan";
 };
 
 export type ExerciseKind = "weighted" | "bodyweight" | "duration";
@@ -71,29 +73,29 @@ export function suggestSet({
   // 1. Carry forward the most recent set from this workout — the user's own adjustment wins.
   const previousHere = doneThisWorkout.at(-1);
   if (previousHere) {
-    return { weight: previousHere.weight, reps: previousHere.reps, durationSeconds: previousHere.durationSeconds };
+    return { weight: previousHere.weight, reps: previousHere.reps, durationSeconds: previousHere.durationSeconds, from: "workout" };
   }
 
   // 2. Last session, matching set number where possible.
   if (lastSession.length) {
     const match = lastSession[Math.min(setIndex, lastSession.length - 1)];
-    if (kind === "duration") return { weight: null, reps: null, durationSeconds: match.durationSeconds ?? range?.max ?? DEFAULT_DURATION_SECONDS };
+    if (kind === "duration") return { weight: null, reps: null, durationSeconds: match.durationSeconds ?? range?.max ?? DEFAULT_DURATION_SECONDS, from: "history" };
 
     // Progressive overload: every set hit the top of the range → add weight, restart at the bottom.
     const hitTop = range && lastSession.every((s) => (s.reps ?? 0) >= range.max);
     if (hitTop && kind === "weighted" && match.weight) {
       const step = weightIncrement(category);
-      return { weight: match.weight + step, reps: range.min, durationSeconds: null, hint: `+${step} kg from last time` };
+      return { weight: match.weight + step, reps: range.min, durationSeconds: null, hint: `+${step} kg from last time`, from: "history" };
     }
     if (hitTop && kind === "bodyweight") {
-      return { weight: match.weight, reps: (match.reps ?? range.max) + 1, durationSeconds: null, hint: "+1 rep from last time" };
+      return { weight: match.weight, reps: (match.reps ?? range.max) + 1, durationSeconds: null, hint: "+1 rep from last time", from: "history" };
     }
-    return { weight: match.weight, reps: match.reps ?? range?.min ?? null, durationSeconds: null };
+    return { weight: match.weight, reps: match.reps ?? range?.min ?? null, durationSeconds: null, from: "history" };
   }
 
   // 3. Plan targets. For timed exercises the plan's "reps" number is seconds.
-  if (kind === "duration") return { weight: null, reps: null, durationSeconds: range?.max ?? DEFAULT_DURATION_SECONDS };
-  return { weight: targetWeight ?? null, reps: range?.min ?? null, durationSeconds: null };
+  if (kind === "duration") return { weight: null, reps: null, durationSeconds: range?.max ?? DEFAULT_DURATION_SECONDS, from: "plan" };
+  return { weight: targetWeight ?? null, reps: range?.min ?? null, durationSeconds: null, from: "plan" };
 }
 
 /** A weighted set with no known weight can't be logged blind; the user picks it once. */
@@ -101,4 +103,26 @@ export function needsInput(kind: ExerciseKind, s: Suggestion) {
   if (kind === "duration") return !s.durationSeconds;
   if (kind === "weighted") return s.weight == null || s.reps == null;
   return s.reps == null;
+}
+
+/** Share taken off working weights during an accepted deload (lighter) week. */
+export const DELOAD_FACTOR = 0.9;
+
+/**
+ * Lighter-week version of a suggestion: about 10% off the weight, rounded to the
+ * exercise's smallest step (and always at least one step lighter). Sets already done in this workout are copied as-is,
+ * so the reduction is never applied twice.
+ */
+export function deloadSuggestion(s: Suggestion, category: string): Suggestion {
+  if (s.from === "workout" || s.weight == null || s.weight <= 0) return s;
+  const step = weightIncrement(category);
+  // Nearest step to 90%, but always at least one step lighter than the original
+  const nearest = Math.round((s.weight * DELOAD_FACTOR) / step) * step;
+  const weight = Math.max(step, Math.min(nearest, s.weight - step));
+  return { ...s, weight, hint: "Lighter week: about 10% off" };
+}
+
+/** Planned sets during a deload: one fewer, never below one. */
+export function deloadSets(planned: number) {
+  return Math.max(1, planned - 1);
 }

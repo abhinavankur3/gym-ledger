@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real, index } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, index, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { sql, relations } from "drizzle-orm";
 
 export const users = sqliteTable("users", {
@@ -147,6 +147,10 @@ export const userProfiles = sqliteTable("user_profiles", {
   avoidMovements: text("avoid_movements"),
   /** Optional sub-regional cuisine (India): north | south | east | west. Null = mixed. */
   cuisineRegion: text("cuisine_region"),
+  /** Calorie target correction learned from the weekly review (kcal, + or −) */
+  kcalAdjustment: integer("kcal_adjustment").notNull().default(0),
+  /** Local Monday (YYYY-MM-DD) of an accepted deload week, if any */
+  deloadWeek: text("deload_week"),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
 });
@@ -262,4 +266,24 @@ export const aiUsage = sqliteTable(
     createdAt: text("created_at").notNull(),
   },
   (table) => [index("idx_ai_usage_user_kind_created").on(table.userId, table.kind, table.createdAt)]
+);
+
+/**
+ * Weekly check-ins from the adaptive engine: what happened last week, and the
+ * changes Kochi proposed. Each proposal carries its own status, so this table
+ * is also the log of every change the user accepted or declined.
+ */
+export const weeklyReviews = sqliteTable(
+  "weekly_reviews",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    /** Local Monday (YYYY-MM-DD) of the week that was reviewed */
+    weekStart: text("week_start").notNull(),
+    summaryJson: text("summary_json").notNull(),
+    proposalsJson: text("proposals_json").notNull(),
+    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+    updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
+  },
+  (table) => [uniqueIndex("uq_weekly_reviews_user_week").on(table.userId, table.weekStart)]
 );
