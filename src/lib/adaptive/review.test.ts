@@ -85,7 +85,7 @@ describe("buildReview", () => {
   it("doesn't change the target when you're eating far from it", () => {
     const r = buildReview({ ...base, weights: weights(80, 0), intake: { daysLogged: 6, avgKcal: 2700 } });
     expect(r.proposals.map((p) => p.type)).not.toContain("calories");
-    expect(r.summary.notes.join(" ")).toMatch(/2700 kcal against a 2100 target/);
+    expect(r.summary.notes.join(" ")).toMatch(/logged about 2700 kcal a day against a 2100 target/);
   });
 
   it("respects the overall adjustment cap", () => {

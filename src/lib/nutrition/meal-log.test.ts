@@ -103,3 +103,22 @@ describe("estimate titles", () => {
     expect(e.title).toBe("Roti, dal tadka and bhindi sabzi");
   });
 });
+
+describe("backdated logging", () => {
+  it("maps a date to its weekday", async () => {
+    const { weekdayOfDateKey } = await import("./meal-log");
+    expect(weekdayOfDateKey("2026-09-28")).toBe(0); // Monday
+    expect(weekdayOfDateKey("2026-10-04")).toBe(6); // Sunday
+  });
+
+  it("allows only real dates in the backdating window", async () => {
+    const { isAllowedLogDate } = await import("./meal-log");
+    const today = "2026-10-03", earliest = "2026-09-03";
+    expect(isAllowedLogDate("2026-10-03", today, earliest)).toBe(true);
+    expect(isAllowedLogDate("2026-09-03", today, earliest)).toBe(true);
+    expect(isAllowedLogDate("2026-10-04", today, earliest)).toBe(false);
+    expect(isAllowedLogDate("2026-09-02", today, earliest)).toBe(false);
+    expect(isAllowedLogDate("2026-02-30", today, "2026-01-01")).toBe(false);
+    expect(isAllowedLogDate("yesterday", today, earliest)).toBe(false);
+  });
+});

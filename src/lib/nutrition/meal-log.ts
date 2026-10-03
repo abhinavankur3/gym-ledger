@@ -93,3 +93,19 @@ export function confirmEstimate(slot: MealSlot, title: string, items: MealItem[]
   if (!kept.length) return null;
   return { slot, title: cleanLabel(title, 80) || kept.map((i) => i.name).join(", "), items: kept, totals: roundTotals(itemsTotal(kept)) };
 }
+
+/** How far back meals and gym days can be logged. */
+export const BACKDATE_DAYS = 30;
+
+/** Weekday (0 = Monday) of a YYYY-MM-DD date key. */
+export function weekdayOfDateKey(date: string) {
+  return (new Date(`${date}T12:00:00Z`).getUTCDay() + 6) % 7;
+}
+
+/** A real calendar date between `earliest` and `today` (inclusive, YYYY-MM-DD). */
+export function isAllowedLogDate(date: string, today: string, earliest: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+  const parsed = new Date(`${date}T12:00:00Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) return false;
+  return date >= earliest && date <= today;
+}

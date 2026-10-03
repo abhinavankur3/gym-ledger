@@ -1,6 +1,10 @@
 "use client";
 
+import { useState } from "react";
+import Link from "next/link";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DayDialog } from "./day-dialog";
 
 const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const MONTH_NAMES = [
@@ -15,9 +19,14 @@ type Props = {
   activeCheckIn: boolean;
   /** YYYY-MM-DD in the user's time zone */
   today: string;
+  /** Earliest day that can be opened to backdate (YYYY-MM-DD) */
+  earliest: string;
+  prevHref: string | null;
+  nextHref: string | null;
 };
 
-export function AttendanceCalendar({ year, month, attendedDays, activeCheckIn, today }: Props) {
+export function AttendanceCalendar({ year, month, attendedDays, activeCheckIn, today, earliest, prevHref, nextHref }: Props) {
+  const [openDay, setOpenDay] = useState<string | null>(null);
   const firstDay = new Date(year, month - 1, 1);
   const lastDay = new Date(year, month, 0);
   const daysInMonth = lastDay.getDate();
@@ -31,9 +40,16 @@ export function AttendanceCalendar({ year, month, attendedDays, activeCheckIn, t
 
   return (
     <section aria-label={`${MONTH_NAMES[month - 1]} ${year}`} className="rounded-3xl bg-card p-5 shadow-soft dark:ring-1 dark:ring-white/5">
-      <div className="flex items-baseline justify-between">
-        <h2 className="font-display text-xl">{MONTH_NAMES[month - 1]}</h2>
-        <span className="text-sm text-muted-foreground">{year}</span>
+      <div className="flex items-center justify-between">
+        <h2 className="font-display text-xl">{MONTH_NAMES[month - 1]} <span className="font-sans text-sm font-normal text-muted-foreground">{year}</span></h2>
+        <div className="flex gap-1">
+          {prevHref ? (
+            <Link href={prevHref} aria-label="Previous month" className="flex h-10 w-10 items-center justify-center rounded-xl hover:bg-muted"><ChevronLeft className="h-5 w-5" /></Link>
+          ) : <span className="h-10 w-10" aria-hidden />}
+          {nextHref ? (
+            <Link href={nextHref} aria-label="Next month" className="flex h-10 w-10 items-center justify-center rounded-xl hover:bg-muted"><ChevronRight className="h-5 w-5" /></Link>
+          ) : <span className="h-10 w-10" aria-hidden />}
+        </div>
       </div>
       <div className="mt-4 grid grid-cols-7 gap-1 text-center">
         {DAY_NAMES.map((d) => (
@@ -49,24 +65,30 @@ export function AttendanceCalendar({ year, month, attendedDays, activeCheckIn, t
           const isToday = dateStr === today;
           const isTodayActive = isToday && activeCheckIn;
 
-          return (
-            <div
-              key={day}
-              aria-label={`${MONTH_NAMES[month - 1]} ${day}${isAttended ? ", checked in" : ""}${isToday ? ", today" : ""}`}
-              className={cn(
-                "tabular mx-auto flex h-10 w-10 items-center justify-center rounded-2xl text-sm transition-colors",
-                isAttended && "bg-legs font-semibold text-ink",
-                isTodayActive && "shadow-soft",
-                isToday && "ring-2 ring-primary ring-offset-2 ring-offset-card",
-                !isAttended && !isToday && "text-muted-foreground",
-                !isAttended && isToday && "font-semibold text-foreground"
-              )}
-            >
+          const openable = dateStr >= earliest && dateStr <= today;
+          const label = `${MONTH_NAMES[month - 1]} ${day}${isAttended ? ", checked in" : ""}${isToday ? ", today" : ""}`;
+          const classes = cn(
+            "tabular mx-auto flex h-10 w-10 items-center justify-center rounded-2xl text-sm transition-colors",
+            isAttended && "bg-legs font-semibold text-ink",
+            isTodayActive && "shadow-soft",
+            isToday && "ring-2 ring-primary ring-offset-2 ring-offset-card",
+            !isAttended && !isToday && (openable ? "text-foreground/80" : "text-muted-foreground/60"),
+            !isAttended && isToday && "font-semibold text-foreground",
+            openable && "hover:ring-2 hover:ring-primary/40"
+          );
+
+          return openable ? (
+            <button key={day} type="button" onClick={() => setOpenDay(dateStr)} aria-label={`${label}. Open to log this day`} className={classes}>
+              {day}
+            </button>
+          ) : (
+            <div key={day} aria-label={label} className={classes}>
               {day}
             </div>
           );
         })}
       </div>
+      <DayDialog date={openDay} onClose={() => setOpenDay(null)} />
     </section>
   );
 }

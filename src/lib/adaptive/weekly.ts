@@ -9,8 +9,6 @@ import { buildReview, isStalled, type Proposal, type ReviewInput, type ReviewSum
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const LB_TO_KG = 0.45359237;
-/** A day counts as logged for intake when at least this many meals were logged */
-const FULL_DAY_MEALS = 3;
 
 /** Local Monday (YYYY-MM-DD) of the week containing `date`. */
 export function weekKey(date: Date, timeZone: string) {
@@ -144,7 +142,8 @@ export async function ensureWeeklyReview(userId: number, timeZone: string): Prom
     const d = byDay.get(l.date) ?? { meals: 0, kcal: 0 };
     byDay.set(l.date, { meals: d.meals + 1, kcal: d.kcal + l.kcal });
   }
-  const fullDays = [...byDay.values()].filter((d) => d.meals >= FULL_DAY_MEALS);
+  // Every day with anything logged counts at what was logged: unlogged meals make intake look low, by design
+  const loggedDays = [...byDay.values()];
 
   const weights = weightRows.map((w) => ({ date: w.date, kg: w.unit === "lbs" ? w.value * LB_TO_KG : w.value }));
   const latestKg = weights.at(-1)?.kg ?? profile.weight;
@@ -171,7 +170,7 @@ export async function ensureWeeklyReview(userId: number, timeZone: string): Prom
     weeksOnPlan: Math.floor((Date.parse(b.thisStart) - Date.parse(`${routine.createdAt.replace(" ", "T")}Z`)) / (7 * DAY_MS)),
     weeksSinceDeload: profile.deloadWeek ? Math.floor((Date.parse(`${b.thisKey}T00:00:00Z`) - Date.parse(`${profile.deloadWeek}T00:00:00Z`)) / (7 * DAY_MS)) : null,
     weights,
-    intake: { daysLogged: fullDays.length, avgKcal: fullDays.length ? fullDays.reduce((a, d) => a + d.kcal, 0) / fullDays.length : null },
+    intake: { daysLogged: loggedDays.length, avgKcal: loggedDays.length ? loggedDays.reduce((a, d) => a + d.kcal, 0) / loggedDays.length : null },
     hasMealPlan: !!activeMealPlan,
     kcalTarget: targets.kcal,
     kcalAdjustment: profile.kcalAdjustment,

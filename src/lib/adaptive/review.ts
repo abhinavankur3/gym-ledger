@@ -29,6 +29,7 @@ export type ReviewInput = {
   weeksSinceDeload: number | null;
   /** Weigh-ins from roughly the last three weeks, in kg */
   weights: Array<{ date: string; kg: number }>;
+  /** Days with any meal logged, and the average logged kcal on those days (missed logs count as not eaten) */
   intake: { daysLogged: number; avgKcal: number | null };
   hasMealPlan: boolean;
   kcalTarget: number;
@@ -150,7 +151,7 @@ export function buildReview(input: ReviewInput): { summary: ReviewSummary; propo
       input.intake.daysLogged >= 4 && input.intake.avgKcal !== null && Math.abs(input.intake.avgKcal - input.kcalTarget) / input.kcalTarget > 0.15;
     if (eatingOffTarget) {
       notes.push(
-        `Your weight is ${trend.kgPerWeek > 0 ? "rising" : "falling"} faster than your goal, but you've been eating about ${Math.round(input.intake.avgKcal!)} kcal against a ${input.kcalTarget} target. Getting closer to the target comes before changing it.`
+        `Your weight is ${trend.kgPerWeek > 0 ? "rising" : "falling"} faster than your goal, but you logged about ${Math.round(input.intake.avgKcal!)} kcal a day against a ${input.kcalTarget} target. Log every meal and get closer to the target before Kochi changes it.`
       );
     } else {
       const kgShiftPerWeek = ((band.aim - trend.pctPerWeek) / 100) * trend.avgKg;

@@ -6,14 +6,29 @@ import { PageHeader } from "@/components/layout/page-header";
 import { AttendanceCalendar } from "./attendance-calendar";
 import { CheckInButton } from "./check-in-button";
 import { Flame } from "lucide-react";
-import { getUserTimeZone, localDateKey, startOfLocalDayIso } from "@/lib/dates";
+import { getUserTimeZone, localDateKey, localDateKeyDaysAgo, startOfLocalDayIso } from "@/lib/dates";
+import { BACKDATE_DAYS } from "@/lib/nutrition/meal-log";
 
-export default async function AttendancePage() {
+export default async function AttendancePage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
   const user = await getCurrentUser();
   const tz = await getUserTimeZone();
   const now = new Date();
   const today = localDateKey(now, tz);
-  const [year, month] = today.split("-").map(Number);
+  // Days in this window can be opened to backdate a gym visit or meals
+  const earliest = localDateKeyDaysAgo(now, BACKDATE_DAYS, tz);
+
+  // Month shown: ?month=YYYY-MM, limited to the months the backdating window touches
+  const current = today.slice(0, 7);
+  const first = earliest.slice(0, 7);
+  const requested = (await searchParams).month;
+  const shown = requested && /^\d{4}-\d{2}$/.test(requested) && requested >= first && requested <= current ? requested : current;
+  const [year, month] = shown.split("-").map(Number);
+  const shift = (delta: number) => {
+    const d = new Date(Date.UTC(year, month - 1 + delta, 1));
+    return d.toISOString().slice(0, 7);
+  };
+  const prevMonth = shift(-1) >= first ? shift(-1) : null;
+  const nextMonth = shift(1) <= current ? shift(1) : null;
 
   // Active check-in (since local midnight)
   const activeCheckIn = await db.query.gymAttendance.findFirst({
@@ -40,10 +55,10 @@ export default async function AttendancePage() {
     cursor.setUTCDate(cursor.getUTCDate() - 1);
   }
 
-  const monthPrefix = today.slice(0, 8);
+  const monthPrefix = `${shown}-`;
   const attendedDays = new Set([...attendedDates].filter((d) => d.startsWith(monthPrefix)));
 
-  const visitsThisMonth = attendedDays.size;
+  const visitsThisMonth = [...attendedDates].filter((d) => d.startsWith(today.slice(0, 8))).length;
 
   return (
     <main className="pb-6">
@@ -73,7 +88,11 @@ export default async function AttendancePage() {
           attendedDays={Array.from(attendedDays)}
           activeCheckIn={!!activeCheckIn}
           today={today}
+          earliest={earliest}
+          prevHref={prevMonth ? `/app/attendance?month=${prevMonth}` : null}
+          nextHref={nextMonth ? (nextMonth === current ? "/app/attendance" : `/app/attendance?month=${nextMonth}`) : null}
         />
+        <p className="mt-2 px-1 text-xs text-muted-foreground">Tap a day from the last {BACKDATE_DAYS} days to add a gym visit or meals you forgot to log.</p>
       </div>
 
       <div className="mt-6">

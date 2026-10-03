@@ -158,16 +158,17 @@ async function resizePhoto(file: File): Promise<string> {
 }
 
 /** Path 2: photo and/or description → Kochi's estimate → adjust → save. */
-export function LogOtherDialog({ slot, onClose }: { slot: MealSlot | null; onClose: () => void }) {
+/** `date` (YYYY-MM-DD) logs to a past day; omitted means today. */
+export function LogOtherDialog({ slot, onClose, date }: { slot: MealSlot | null; onClose: () => void; date?: string }) {
   const open = slot !== null;
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] grid-cols-1 overflow-y-auto overflow-x-hidden sm:max-w-md [&>*]:min-w-0">{open && <LogOtherForm initialSlot={slot} onDone={onClose} />}</DialogContent>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] grid-cols-1 overflow-y-auto overflow-x-hidden sm:max-w-md [&>*]:min-w-0">{open && <LogOtherForm initialSlot={slot} onDone={onClose} date={date} />}</DialogContent>
     </Dialog>
   );
 }
 
-function LogOtherForm({ initialSlot, onDone }: { initialSlot: MealSlot; onDone: () => void }) {
+function LogOtherForm({ initialSlot, onDone, date }: { initialSlot: MealSlot; onDone: () => void; date?: string }) {
   const [slotChoice, setSlotChoice] = useState<MealSlot>(initialSlot);
   const [photo, setPhoto] = useState<string | null>(null);
   const [description, setDescription] = useState("");
@@ -209,7 +210,7 @@ function LogOtherForm({ initialSlot, onDone }: { initialSlot: MealSlot; onDone: 
   function save() {
     setError("");
     startTransition(async () => {
-      const result = await saveEstimatedMeal({ slot: slotChoice, title, items, source: photo ? "photo" : "text" });
+      const result = await saveEstimatedMeal({ slot: slotChoice, title, items, source: photo ? "photo" : "text", date });
       if (result?.error) {
         setError(result.error);
         return;

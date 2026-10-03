@@ -137,6 +137,8 @@ Each phase ends with a commit.
   - 3+ lifts stalled for three sessions → lighter week (about 10% off weights, one fewer set), at most every 5 weeks.
   - Weight trend outside the goal's healthy rate (≥4 weigh-ins over 7+ days) → calorie target ± (step ≤250, total ≤±600, never below the safety floor); no change when intake is far from target.
 - Thin data produces notes asking for weigh-ins and meal logs instead of guesses.
+- Intake for the calorie check counts every day with any meal logged at what was logged, so missed logs show up as low intake (by design); the "eating off target" note says "you logged…".
+- Backdating: the attendance calendar opens any of the last 30 days to add or remove a gym visit, log that weekday's planned meals, or log another meal by photo or text for that day.
 
 ### Phase 4 — Kochi coach
 - Chat grounded in the user's data: explains changes from the Phase 3 log, summarises progress, answers training/meal questions, helps after missed sessions.
