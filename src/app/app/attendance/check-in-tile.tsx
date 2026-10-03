@@ -35,14 +35,14 @@ export function CheckInTile({ checkInTime, className }: { checkInTime: string | 
       <span className={cn("flex h-10 w-10 items-center justify-center rounded-2xl", isCheckedIn ? "bg-legs text-ink" : "bg-legs/15 text-legs")}>
         <MapPin className="h-5 w-5" />
       </span>
-      <span className="mt-4 text-sm text-muted-foreground">{isCheckedIn ? "At the gym since" : "At the gym?"}</span>
-      <span className="mt-1 font-display text-2xl" suppressHydrationWarning>
+      <span className="mt-3 font-semibold leading-tight" suppressHydrationWarning>
         {pending
           ? "…"
           : isCheckedIn
             ? new Date(checkInTime).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
             : "Check in"}
       </span>
+      <span className="mt-0.5 text-xs text-muted-foreground">{isCheckedIn ? "At the gym. Tap to leave" : "At the gym?"}</span>
     </button>
   );
 }

@@ -14,8 +14,8 @@ import { deleteMealLog, estimateMeal, logPlannedMeal, saveEstimatedMeal } from "
 
 export type TodayLog = { id: number; slot: MealSlot; source: "plan" | "photo" | "text"; title: string; portion: number | null; kcal: number; protein: number };
 
-const PORTION_CHOICES: Array<[number, string]> = [[0.5, "½"], [0.75, "¾"], [1.25, "1¼"], [1.5, "1½"]];
-const PORTION_NAMES: Record<number, string> = { 0.5: "half", 0.75: "three quarters of", 1.25: "a quarter more than", 1.5: "one and a half times" };
+export const PORTION_CHOICES: Array<[number, string]> = [[0.5, "½"], [0.75, "¾"], [1.25, "1¼"], [1.5, "1½"]];
+export const PORTION_NAMES: Record<number, string> = { 0.5: "half", 0.75: "three quarters of", 1.25: "a quarter more than", 1.5: "one and a half times" };
 
 function portionLabel(p: number | null) {
   if (p === null || p === 1) return "";
@@ -158,7 +158,7 @@ async function resizePhoto(file: File): Promise<string> {
 }
 
 /** Path 2: photo and/or description → Kochi's estimate → adjust → save. */
-function LogOtherDialog({ slot, onClose }: { slot: MealSlot | null; onClose: () => void }) {
+export function LogOtherDialog({ slot, onClose }: { slot: MealSlot | null; onClose: () => void }) {
   const open = slot !== null;
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
