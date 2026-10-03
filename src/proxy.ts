@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { decrypt } from "@/lib/auth/session";
 
-const PUBLIC_ROUTES = ["/login", "/change-password"];
+// "/" is the public landing page: it always renders, signed in or not
+const PUBLIC_ROUTES = ["/", "/login", "/change-password"];
 const STATIC_PREFIXES = ["/_next", "/icon-", "/sw.js", "/manifest", "/favicon.ico"];
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Allow static assets and public routes
@@ -27,12 +28,6 @@ export async function middleware(request: NextRequest) {
   // Admin route protection
   if (pathname.startsWith("/admin") && session.role !== "admin") {
     return NextResponse.redirect(new URL("/app", request.url));
-  }
-
-  // Root redirect
-  if (pathname === "/") {
-    const target = session.role === "admin" ? "/admin" : "/app";
-    return NextResponse.redirect(new URL(target, request.url));
   }
 
   return NextResponse.next();
