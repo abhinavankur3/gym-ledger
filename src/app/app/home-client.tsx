@@ -44,20 +44,25 @@ export function NextMeal({ meals, logs, currentSlot }: { meals: Meal[]; logs: To
 
   return (
     <section aria-labelledby="next-meal-heading" className="rounded-3xl bg-card p-5 shadow-soft dark:ring-1 dark:ring-white/5">
-      <div className="flex items-center justify-between gap-3">
-        <h2 id="next-meal-heading" className="font-display text-xl">{next ? `Next: ${SLOT_LABEL[next.slot].toLowerCase()}` : "Meals"}</h2>
-        <ol className="flex gap-1.5" aria-label="Today's meals">
-          {meals.map((m) => (
+      <h2 id="next-meal-heading" className="font-display text-xl">{next ? `Next: ${SLOT_LABEL[next.slot].toLowerCase()}` : "Meals"}</h2>
+      <ol className="mt-2 flex flex-wrap gap-1.5" aria-label="Today's meals">
+        {meals.map((m) => {
+          const logged = isLogged(m.slot);
+          return (
             <li
               key={m.slot}
-              title={`${SLOT_LABEL[m.slot]}${isLogged(m.slot) ? ", logged" : ""}`}
-              className={cn("flex h-7 min-w-7 items-center justify-center rounded-full px-2 text-[11px] font-bold", isLogged(m.slot) ? "bg-legs text-ink" : "bg-muted text-muted-foreground")}
+              aria-label={`${SLOT_LABEL[m.slot]}, ${logged ? "logged" : "not logged yet"}`}
+              className={cn(
+                "inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-xs font-semibold",
+                logged ? "bg-legs text-ink" : next?.slot === m.slot ? "bg-primary/12 text-primary ring-1 ring-primary/30" : "bg-muted text-muted-foreground"
+              )}
             >
-              {isLogged(m.slot) ? <Check className="h-3.5 w-3.5" strokeWidth={3} aria-label={`${SLOT_LABEL[m.slot]} logged`} /> : SLOT_LABEL[m.slot].slice(0, 1)}
+              {logged && <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden />}
+              {SLOT_LABEL[m.slot]}
             </li>
-          ))}
-        </ol>
-      </div>
+          );
+        })}
+      </ol>
 
       {next && planned ? (
         <>
