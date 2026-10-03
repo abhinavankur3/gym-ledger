@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowDown, Camera, Check, Dumbbell, LineChart, Lock, MessageCircle, Salad, Server } from "lucide-react";
+import { ArrowDown, Check, Dumbbell, LineChart, MessageCircle, Salad } from "lucide-react";
 import { getSession } from "@/lib/auth/session";
 import { BrandMark } from "@/components/brand-mark";
 import { EquipmentArt } from "@/components/equipment-art";
@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Kochi — your coach for training and food",
-  description: "Kochi builds your weekly workouts and meals, then helps you follow them with one tap per set and one tap per meal. Self-hosted.",
+  description: "Kochi builds your weekly workouts and meals, then helps you follow them with one tap per set and one tap per meal.",
 };
 
 /** Public landing page. Always shown at "/", signed in or not; the CTA goes to the right place. */
@@ -52,7 +52,6 @@ export default async function LandingPage() {
                 How it works <ArrowDown className="h-4 w-4" />
               </a>
             </div>
-            {!session && <p className="mt-4 text-sm text-muted-foreground">Accounts are created by whoever runs your Kochi server.</p>}
           </div>
 
           <HeroPreview />
@@ -102,35 +101,10 @@ export default async function LandingPage() {
           </div>
         </section>
 
-        {/* Self-hosted */}
-        <section aria-labelledby="own-heading" className="mx-auto w-full max-w-6xl px-5 pb-20 sm:px-8">
-          <div className="grid gap-8 rounded-[2rem] bg-ink p-8 text-white shadow-lift sm:p-12 lg:grid-cols-[1.2fr_1fr] dark:bg-card dark:ring-1 dark:ring-white/5">
-            <div>
-              <h2 id="own-heading" className="font-display text-4xl">Your data stays on your server<span className="text-sun">.</span></h2>
-              <p className="mt-4 max-w-xl leading-7 text-white/75">Kochi runs as a single container with a SQLite database you own. Accounts are created by you, not a sign-up form.</p>
-            </div>
-            <ul className="space-y-4">
-              {[
-                [Server, "One Docker container, one database file"],
-                [Lock, "Only the people you invite can sign in"],
-                [Camera, "Food photos are used for the estimate and never stored"],
-              ].map(([Icon, text]) => {
-                const I = Icon as typeof Server;
-                return (
-                  <li key={text as string} className="flex items-center gap-3">
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10"><I className="h-5 w-5 text-sun" /></span>
-                    <span className="text-white/90">{text as string}</span>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        </section>
-
         {/* Closing CTA */}
         <section className="mx-auto w-full max-w-6xl px-5 pb-24 text-center sm:px-8">
           <h2 className="mx-auto max-w-2xl font-display text-4xl sm:text-5xl">Ready when you are<span className="text-primary">.</span></h2>
-          <p className="mx-auto mt-4 max-w-md text-muted-foreground">{session ? "Pick up where you left off." : "Sign in with the account your Kochi admin set up for you."}</p>
+          <p className="mx-auto mt-4 max-w-md text-muted-foreground">{session ? "Pick up where you left off." : "Sign in and Kochi will build your first week."}</p>
           <Link href={cta.href} className="mt-8 inline-flex h-14 items-center justify-center rounded-2xl bg-primary px-10 text-base font-semibold text-primary-foreground shadow-glow hover:bg-primary/90">
             {cta.label}
           </Link>
