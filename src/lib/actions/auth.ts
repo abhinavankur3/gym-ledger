@@ -1,15 +1,39 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import db from "@/lib/db";
 import { users, userPreferences, userProfiles } from "@/lib/db/schema";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { createSession, deleteSession } from "@/lib/auth/session";
-import { requireAdmin, verifySession } from "@/lib/auth/dal";
+import { requireAdmin, verifySessionAllowingPasswordChange } from "@/lib/auth/dal";
 import { setThemeCookie } from "@/lib/theme";
 import { loginSchema, changePasswordSchema, createUserSchema } from "@/lib/validators/schemas";
+
+/**
+ * Constant bcrypt hash compared when the email isn't found, so a wrong email takes
+ * as long as a wrong password and response time doesn't reveal which emails exist.
+ */
+const DUMMY_HASH = "$2b$12$7w6bvtP9mm.Cyy8GXYZgoeI3Q9i/GW4gJUvftvrSXPD2/iNBIhOi.";
+
+/** Failed logins per email+IP in this process; a single-container app, so memory is enough. */
+const MAX_FAILED_LOGINS = 5;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const failedLogins = new Map<string, number[]>();
+
+function recentFailures(key: string, now: number) {
+  const recent = (failedLogins.get(key) ?? []).filter((t) => now - t < LOGIN_WINDOW_MS);
+  if (recent.length) failedLogins.set(key, recent);
+  else failedLogins.delete(key);
+  return recent;
+}
+
+async function clientIp() {
+  const h = await headers();
+  return h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown";
+}
 
 export async function login(_prev: unknown, formData: FormData) {
   const raw = {
@@ -22,20 +46,24 @@ export async function login(_prev: unknown, formData: FormData) {
     return { error: "Invalid email or password." };
   }
 
+  const now = Date.now();
+  const limitKey = `${parsed.data.email.toLowerCase()}|${await clientIp()}`;
+  if (recentFailures(limitKey, now).length >= MAX_FAILED_LOGINS) {
+    return { error: "Too many failed attempts. Wait 15 minutes and try again." };
+  }
+
   const user = await db.query.users.findFirst({
     where: eq(users.email, parsed.data.email),
   });
 
-  if (!user) {
+  const valid = await verifyPassword(parsed.data.password, user?.passwordHash ?? DUMMY_HASH);
+  if (!user || !valid) {
+    failedLogins.set(limitKey, [...recentFailures(limitKey, now), now]);
     return { error: "Invalid email or password." };
   }
+  failedLogins.delete(limitKey);
 
-  const valid = await verifyPassword(parsed.data.password, user.passwordHash);
-  if (!valid) {
-    return { error: "Invalid email or password." };
-  }
-
-  await createSession(user.id, user.role);
+  await createSession(user.id, user.role, user.sessionVersion);
 
   const prefs = await db.query.userPreferences.findFirst({ where: eq(userPreferences.userId, user.id) });
   if (prefs?.theme) await setThemeCookie(prefs.theme);
@@ -64,7 +92,7 @@ export async function logout() {
 }
 
 export async function changePassword(_prev: unknown, formData: FormData) {
-  const session = await verifySession();
+  const session = await verifySessionAllowingPasswordChange();
 
   const raw = {
     currentPassword: formData.get("currentPassword") as string,
@@ -101,14 +129,18 @@ export async function changePassword(_prev: unknown, formData: FormData) {
 
   const newHash = await hashPassword(parsed.data.newPassword);
 
-  await db
+  // Bumping the version signs out every other session; this one gets a fresh cookie
+  const [updated] = await db
     .update(users)
     .set({
       passwordHash: newHash,
       forcePasswordChange: false,
+      sessionVersion: sql`${users.sessionVersion} + 1`,
       updatedAt: new Date().toISOString(),
     })
-    .where(eq(users.id, session.userId));
+    .where(eq(users.id, session.userId))
+    .returning({ sessionVersion: users.sessionVersion });
+  await createSession(user.id, user.role, updated.sessionVersion);
 
   redirect("/app");
 }
@@ -191,6 +223,8 @@ export async function resetUserPassword(userId: number, newPassword: string) {
     .set({
       passwordHash,
       forcePasswordChange: true,
+      // Signs the user out everywhere, e.g. when an account is compromised
+      sessionVersion: sql`${users.sessionVersion} + 1`,
       updatedAt: new Date().toISOString(),
     })
     .where(eq(users.id, userId));

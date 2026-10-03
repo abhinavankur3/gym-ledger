@@ -1,12 +1,15 @@
 import db from "@/lib/db";
 import { requireUser } from "@/lib/auth/dal";
+import { visibleExercises } from "@/lib/exercises";
 import { PageHeader } from "@/components/layout/page-header";
 import { ExerciseList } from "./exercise-list";
 
 export default async function ExercisesPage() {
-  await requireUser();
+  const user = await requireUser();
 
+  // Built-in exercises plus this user's own; other users' custom exercises stay private
   const allExercises = await db.query.exercises.findMany({
+    where: visibleExercises(user.id),
     orderBy: (exercises, { asc }) => [
       asc(exercises.primaryMuscleGroup),
       asc(exercises.name),

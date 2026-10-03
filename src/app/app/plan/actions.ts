@@ -7,6 +7,7 @@ import db from "@/lib/db";
 import { nutritionPlans, planDrafts, routines, userProfiles, workoutTemplateExercises } from "@/lib/db/schema";
 import { verifySession } from "@/lib/auth/dal";
 import { generatePlan, normalizePlanFeedback, persistPlan } from "@/lib/ai/plan-generator";
+import { isQuotaError, withAiQuota } from "@/lib/ai/quota";
 import type { Plan } from "@/lib/ai/plan-types";
 
 export async function getPlanDraft() {
@@ -72,7 +73,9 @@ export async function regeneratePlan(formData: FormData) {
   if (!profile) return { error: "Complete your profile before generating a plan." };
 
   const feedback = normalizePlanFeedback(String(formData.get("feedback") ?? ""));
-  const plan = await generatePlan(profile, feedback);
+  const generated = await withAiQuota(session.userId, "workout_plan", () => generatePlan(profile, session.userId, feedback));
+  if (isQuotaError(generated)) return { error: generated.error };
+  const { plan, source } = generated;
 
   await db.insert(planDrafts).values({
     userId: session.userId,
@@ -85,27 +88,32 @@ export async function regeneratePlan(formData: FormData) {
   });
 
   revalidatePath("/app/plan");
-  return { success: true };
+  return { success: true, source };
 }
 
 export async function confirmPlan() {
   const session = await verifySession();
-  const draft = await db.query.planDrafts.findFirst({
-    where: and(eq(planDrafts.userId, session.userId)),
-  });
+  // Claim the draft atomically: a double submit finds nothing left and does nothing
+  const [draft] = await db.delete(planDrafts).where(eq(planDrafts.userId, session.userId)).returning();
   if (!draft) redirect("/app");
 
-  let plan: Plan;
+  let plan: Plan | null = null;
   try {
     plan = JSON.parse(draft.planJson) as Plan;
   } catch {
-    redirect("/onboarding");
+    plan = null;
   }
+  if (!plan) redirect("/onboarding");
 
-  await persistPlan(session.userId, plan!);
-  await db.delete(planDrafts).where(eq(planDrafts.userId, session.userId));
+  try {
+    await persistPlan(session.userId, plan);
+  } catch (error) {
+    // Put the draft back so the user can try again
+    await db.insert(planDrafts).values({ userId: session.userId, planJson: draft.planJson, feedback: draft.feedback, updatedAt: new Date().toISOString() }).onConflictDoNothing();
+    throw error;
+  }
   revalidatePath("/app");
-  // Training is set; if there's no meal plan yet, that's the natural next step
-  const hasMealPlan = await db.query.nutritionPlans.findFirst({ where: eq(nutritionPlans.userId, session.userId), columns: { id: true } });
+  // Training is set; if there's no active meal plan yet, that's the natural next step
+  const hasMealPlan = await db.query.nutritionPlans.findFirst({ where: and(eq(nutritionPlans.userId, session.userId), eq(nutritionPlans.status, "active")), columns: { id: true } });
   redirect(hasMealPlan ? "/app" : "/app/nutrition");
 }

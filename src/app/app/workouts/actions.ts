@@ -13,21 +13,33 @@ import {
   workoutTemplateExercises,
 } from "@/lib/db/schema";
 import { verifySession } from "@/lib/auth/dal";
+import { visibleExercises } from "@/lib/exercises";
+import { getUserTimeZone, startOfLocalDayIso } from "@/lib/dates";
 
 export async function startWorkout(name: string) {
   const session = await verifySession();
+  const cleanName = typeof name === "string" ? name.replace(/\s+/g, " ").trim().slice(0, 80) : "";
+  if (!cleanName) return { error: "Give the workout a name." };
 
   const [workout] = await db
     .insert(workouts)
     .values({
       userId: session.userId,
-      name,
+      name: cleanName,
       startedAt: new Date().toISOString(),
     })
     .returning();
 
   revalidatePath("/app/workouts");
   return { workoutId: workout.id };
+}
+
+const SET_TYPES = ["warmup", "working", "dropset", "failure"] as const;
+
+/** Finite number within [min, max], or undefined when absent. Anything else is invalid. */
+function inRange(value: unknown, min: number, max: number): number | undefined | null {
+  if (value === undefined || value === null) return undefined;
+  return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max ? value : null;
 }
 
 export async function addSet(
@@ -44,7 +56,27 @@ export async function addSet(
 ) {
   const session = await verifySession();
 
-  // Verify workout belongs to user
+  // Server actions are public endpoints: validate everything the client sends
+  const setNumber = inRange(data?.setNumber, 1, 50);
+  const reps = inRange(data?.reps, 0, 200);
+  const weight = inRange(data?.weight, 0, 1000);
+  const durationSeconds = inRange(data?.durationSeconds, 0, 36000);
+  const rpe = inRange(data?.rpe, 1, 10);
+  if (
+    !Number.isInteger(workoutId) ||
+    !Number.isInteger(exerciseId) ||
+    !SET_TYPES.includes(data?.setType) ||
+    !setNumber ||
+    !Number.isInteger(setNumber) ||
+    reps === null ||
+    weight === null ||
+    durationSeconds === null ||
+    rpe === null
+  ) {
+    return { error: "That set doesn't look right. Check the numbers and try again." };
+  }
+
+  // Verify workout belongs to user and is still open
   const workout = await db.query.workouts.findFirst({
     where: and(
       eq(workouts.id, workoutId),
@@ -53,34 +85,45 @@ export async function addSet(
   });
 
   if (!workout) return { error: "Workout not found." };
+  if (workout.completedAt) return { error: "This workout is finished. Start a new one to log more sets." };
 
-  // Check if this is a PR (highest weight for this exercise by this user)
+  const exercise = await db.query.exercises.findFirst({
+    where: and(eq(exercises.id, exerciseId), visibleExercises(session.userId)),
+    columns: { id: true },
+  });
+  if (!exercise) return { error: "Exercise not found." };
+
+  // PR: heavier than every earlier non-warm-up set at the same or more reps.
+  // The very first time an exercise is logged isn't a PR (there's nothing to beat).
   let isPr = false;
-  if (data.weight && data.reps) {
-    const maxWeight = await db
-      .select({ maxWeight: sql<number>`MAX(${workoutSets.weight})` })
+  if (weight && reps && data.setType !== "warmup") {
+    const [prior] = await db
+      .select({
+        count: sql<number>`COUNT(*)`,
+        maxWeight: sql<number | null>`MAX(CASE WHEN ${workoutSets.reps} >= ${reps} THEN ${workoutSets.weight} END)`,
+      })
       .from(workoutSets)
       .innerJoin(workouts, eq(workoutSets.workoutId, workouts.id))
       .where(
         and(
           eq(workouts.userId, session.userId),
           eq(workoutSets.exerciseId, exerciseId),
-          sql`${workoutSets.reps} >= ${data.reps}`
+          ne(workoutSets.setType, "warmup")
         )
       );
 
-    isPr = !maxWeight[0]?.maxWeight || data.weight > maxWeight[0].maxWeight;
+    isPr = (prior?.count ?? 0) > 0 && (prior?.maxWeight == null || weight > prior.maxWeight);
   }
 
   await db.insert(workoutSets).values({
     workoutId,
     exerciseId,
-    setNumber: data.setNumber,
+    setNumber,
     setType: data.setType,
-    reps: data.reps ?? null,
-    weight: data.weight ?? null,
-    durationSeconds: data.durationSeconds ?? null,
-    rpe: data.rpe ?? null,
+    reps: reps ?? null,
+    weight: weight ?? null,
+    durationSeconds: durationSeconds ?? null,
+    rpe: rpe ?? null,
     isPr,
     completedAt: new Date().toISOString(),
   });
@@ -165,38 +208,26 @@ export async function getWorkoutHistory() {
     limit: 50,
   });
 
-  // Get set counts for each workout
-  const workoutsWithSets = await Promise.all(
-    userWorkouts.map(async (w) => {
-      const sets = await db.query.workoutSets.findMany({
-        where: eq(workoutSets.workoutId, w.id),
-      });
+  // One query for all sets (with each exercise's muscle) instead of a query per workout and per exercise
+  const ids = userWorkouts.map((w) => w.id);
+  const sets = ids.length
+    ? await db
+        .select({ workoutId: workoutSets.workoutId, exerciseId: workoutSets.exerciseId, weight: workoutSets.weight, reps: workoutSets.reps, muscle: exercises.primaryMuscleGroup })
+        .from(workoutSets)
+        .innerJoin(exercises, eq(workoutSets.exerciseId, exercises.id))
+        .where(inArray(workoutSets.workoutId, ids))
+    : [];
 
-      const exerciseIds = [...new Set(sets.map((s) => s.exerciseId))];
-      const exerciseDetails = await Promise.all(
-        exerciseIds.map((id) =>
-          db.query.exercises.findFirst({ where: eq(exercises.id, id) })
-        )
-      );
-
-      const totalVolume = sets.reduce(
-        (acc, s) => acc + (s.weight ?? 0) * (s.reps ?? 0),
-        0
-      );
-
-      const muscleGroups = [
-        ...new Set(exerciseDetails.filter(Boolean).map((e) => e!.primaryMuscleGroup)),
-      ];
-
-      return {
-        ...w,
-        setCount: sets.length,
-        exerciseCount: exerciseIds.length,
-        totalVolume,
-        muscleGroups,
-      };
-    })
-  );
+  const workoutsWithSets = userWorkouts.map((w) => {
+    const own = sets.filter((s) => s.workoutId === w.id);
+    return {
+      ...w,
+      setCount: own.length,
+      exerciseCount: new Set(own.map((s) => s.exerciseId)).size,
+      totalVolume: own.reduce((acc, s) => acc + (s.weight ?? 0) * (s.reps ?? 0), 0),
+      muscleGroups: [...new Set(own.map((s) => s.muscle))],
+    };
+  });
 
   return workoutsWithSets;
 }
@@ -307,8 +338,9 @@ export async function getLastPerformance(exerciseIds: number[], currentWorkoutId
 }
 
 /**
- * One-tap start from Home: opens an unfinished session of this template from the
- * last 12 hours if there is one, otherwise creates it, then goes straight to logging.
+ * One-tap start from Home: opens an unfinished session of this template started
+ * since local midnight if there is one (same rule Home uses for "Resume"),
+ * otherwise creates it, then goes straight to logging.
  */
 export async function startOrResumeSession(templateId: number) {
   const session = await verifySession();
@@ -319,7 +351,7 @@ export async function startOrResumeSession(templateId: number) {
   });
   if (!template) redirect("/app/workouts/new");
 
-  const since = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
+  const since = startOfLocalDayIso(new Date(), await getUserTimeZone());
   const open = await db.query.workouts.findFirst({
     where: and(
       eq(workouts.userId, session.userId),

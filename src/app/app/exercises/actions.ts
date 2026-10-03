@@ -1,40 +1,35 @@
 "use server";
 
-import { like } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import db from "@/lib/db";
 import { exercises } from "@/lib/db/schema";
 import { verifySession } from "@/lib/auth/dal";
+import { EXERCISE_CATEGORIES, MUSCLE_GROUPS } from "@/lib/ai/plan-types";
 
-export async function getExercises(search?: string, category?: string, muscleGroup?: string) {
-  await verifySession();
-
-  // Build conditions - for simplicity we'll filter in JS for complex cases
-  const allExercises = await db.query.exercises.findMany({
-    orderBy: (exercises, { asc }) => [asc(exercises.primaryMuscleGroup), asc(exercises.name)],
-  });
-
-  return allExercises.filter((e) => {
-    if (search && !e.name.toLowerCase().includes(search.toLowerCase())) return false;
-    if (category && category !== "all" && e.category !== category) return false;
-    if (muscleGroup && muscleGroup !== "all" && e.primaryMuscleGroup !== muscleGroup) return false;
-    return true;
-  });
-}
+const customExerciseSchema = z.object({
+  name: z.string().trim().min(2).max(60),
+  category: z.enum(EXERCISE_CATEGORIES),
+  primaryMuscleGroup: z.enum(MUSCLE_GROUPS),
+});
 
 export async function createCustomExercise(formData: FormData) {
   const session = await verifySession();
 
-  const name = formData.get("name") as string;
-  const category = formData.get("category") as string;
-  const primaryMuscleGroup = formData.get("primaryMuscleGroup") as string;
-
-  if (!name || !category || !primaryMuscleGroup) {
-    return { error: "All fields are required." };
+  const parsed = customExerciseSchema.safeParse({
+    name: formData.get("name"),
+    category: formData.get("category"),
+    primaryMuscleGroup: formData.get("primaryMuscleGroup"),
+  });
+  if (!parsed.success) {
+    return { error: "Give the exercise a name (2–60 characters), equipment and a muscle group." };
   }
+  const { name, category, primaryMuscleGroup } = parsed.data;
 
+  // Names are unique across the table, so check case-insensitively before inserting
   const existing = await db.query.exercises.findFirst({
-    where: like(exercises.name, name),
+    where: sql`lower(${exercises.name}) = lower(${name})`,
   });
 
   if (existing) {
@@ -43,7 +38,7 @@ export async function createCustomExercise(formData: FormData) {
 
   await db.insert(exercises).values({
     name,
-    category: category as "barbell" | "dumbbell" | "machine" | "cable" | "bodyweight" | "cardio" | "other",
+    category,
     primaryMuscleGroup,
     secondaryMuscleGroups: "[]",
     isCustom: true,

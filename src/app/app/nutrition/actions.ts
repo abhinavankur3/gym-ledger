@@ -7,6 +7,7 @@ import { bodyMetrics, nutritionPlans, userProfiles } from "@/lib/db/schema";
 import { verifySession } from "@/lib/auth/dal";
 import { getUserTimeZone } from "@/lib/dates";
 import { generateMealPlan } from "@/lib/ai/meal-plan-generator";
+import { isQuotaError, withAiQuota } from "@/lib/ai/quota";
 import { FEEDBACK_MAX, sanitizeUserText } from "@/lib/ai/user-text";
 import { computeTargets, type NutritionTargets } from "@/lib/nutrition/targets";
 import { countryFromTimeZone, cuisineFor, INDIAN_REGIONS } from "@/lib/nutrition/region";
@@ -55,8 +56,15 @@ export async function getNutritionState() {
   });
 
   const country = countryFromTimeZone(timeZone);
-  const parse = (row: (typeof plans)[number] | undefined) =>
-    row && { id: row.id, plan: JSON.parse(row.planJson) as MealPlan, targets: JSON.parse(row.targetsJson) as NutritionTargets, source: row.source, cuisine: row.cuisine, feedback: row.feedback ?? "", createdAt: row.createdAt };
+  // A corrupt row is skipped rather than crashing the page
+  const parse = (row: (typeof plans)[number] | undefined) => {
+    if (!row) return undefined;
+    try {
+      return { id: row.id, plan: JSON.parse(row.planJson) as MealPlan, targets: JSON.parse(row.targetsJson) as NutritionTargets, source: row.source, cuisine: row.cuisine, feedback: row.feedback ?? "", createdAt: row.createdAt };
+    } catch {
+      return undefined;
+    }
+  };
 
   return {
     targets,
@@ -80,7 +88,7 @@ export async function buildMealPlan(formData: FormData) {
   if (!state || !profile) return { error: "Finish onboarding before building a meal plan." };
 
   const feedback = sanitizeUserText(String(formData.get("feedback") ?? ""), FEEDBACK_MAX);
-  const { plan, source } = await generateMealPlan({
+  const generated = await withAiQuota(session.userId, "meal_plan", () => generateMealPlan({
     targets: state.targets,
     goal: profile.goal,
     diet: state.diet,
@@ -89,7 +97,9 @@ export async function buildMealPlan(formData: FormData) {
     country: state.country,
     indianRegion: state.indianRegion,
     feedback,
-  });
+  }));
+  if (isQuotaError(generated)) return { error: generated.error };
+  const { plan, source } = generated;
 
   const now = new Date().toISOString();
   await db.transaction(async (tx) => {

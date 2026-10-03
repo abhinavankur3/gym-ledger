@@ -16,6 +16,8 @@ type JsonCall = {
 
 const MAX_IMAGE_DATA_URL = 2_000_000;
 
+let warnedNoModel = false;
+
 /** Accepts only base64 data URLs for common image types, within the upload limit. */
 export function isSafeImageDataUrl(value: string) {
   return (
@@ -44,6 +46,11 @@ export async function openRouterJson({
     return null;
   }
   const model = process.env.OPENROUTER_GENERATION_MODEL;
+  if (!model) {
+    if (!warnedNoModel) console.warn("[openrouter] OPENROUTER_GENERATION_MODEL is not set; AI calls are skipped and fallbacks are used");
+    warnedNoModel = true;
+    return null;
+  }
   if (image && !isSafeImageDataUrl(image)) {
     console.warn(`[openrouter] ${name}: rejected image (unsupported type or too large)`);
     return null;

@@ -145,7 +145,7 @@ function TargetsCard({ targets, weightFromLog }: { targets: NutritionTargets; we
           </div>
         ))}
       </div>
-      <p className="mt-3 text-sm text-muted-foreground">Meals cover about 80% of this. A protein shake makes up the rest of your protein, and what&apos;s left of the calories is yours to use.</p>
+      <p className="mt-3 text-sm text-muted-foreground">Meals cover about 80% of this. A protein shake makes up the rest of your protein, and what&apos;s left of the calories is yours to use. All numbers are estimates, not medical advice.</p>
       <details className="group mt-4">
         <summary className="flex cursor-pointer list-none items-center gap-1 text-sm font-semibold text-primary">
           How Kochi worked this out <ChevronRight className="h-4 w-4 transition-transform group-open:rotate-90" />

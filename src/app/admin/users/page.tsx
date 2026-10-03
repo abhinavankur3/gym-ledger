@@ -1,3 +1,4 @@
+import { requireAdmin } from "@/lib/auth/dal";
 import { desc } from "drizzle-orm";
 import db from "@/lib/db";
 import { users } from "@/lib/db/schema";
@@ -5,7 +6,11 @@ import { CreateUserDialog } from "./create-user-dialog";
 import { UserTable } from "./user-table";
 
 export default async function AdminUsersPage() {
+  // Layouts can be skipped on client navigation, so each admin page checks too
+  await requireAdmin();
+  // Only what the table shows: never send password hashes to the browser
   const allUsers = await db.query.users.findMany({
+    columns: { id: true, email: true, name: true, role: true, forcePasswordChange: true, createdAt: true },
     orderBy: [desc(users.createdAt)],
   });
 

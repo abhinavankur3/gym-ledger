@@ -11,6 +11,8 @@ export const AVOID_MAX = 300;
 export function sanitizeUserText(value: string | null | undefined, max: number) {
   return (value ?? "")
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
+    // Invisible format characters (zero-width, bidi overrides) can hide or reorder text
+    .replace(/\p{Cf}/gu, "")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, max);

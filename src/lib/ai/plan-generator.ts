@@ -1,6 +1,6 @@
 import "server-only";
 
-import { asc, eq, or } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import db from "@/lib/db";
 import {
@@ -13,12 +13,15 @@ import { AVOID_MAX, FEEDBACK_MAX, sanitizeUserText } from "@/lib/ai/user-text";
 import { jevScore, openRouterJson } from "@/lib/ai/openrouter";
 import { pickBest } from "@/lib/ai/scoring";
 import {
+  cleanExerciseName,
   deterministicPlan,
+  exerciseKey,
   goalLabels,
   resolvePlan,
   type ExerciseRecord,
   type Profile,
 } from "@/lib/ai/plan-rules";
+import { visibleExercises } from "@/lib/exercises";
 import {
   exercises,
   routineDays,
@@ -53,22 +56,26 @@ export function normalizePlanFeedback(value: string | null | undefined) {
   return sanitizeUserText(value, FEEDBACK_MAX);
 }
 
-export async function generatePlan(profile: Profile, feedback?: string | null) {
-  const library = await db.query.exercises.findMany({ orderBy: [asc(exercises.name)] });
+export type PlanSource = "ai" | "fallback";
+
+/**
+ * Two model candidates, validated, then Jev picks one. Only the built-in library and
+ * this user's own custom exercises are shown to the model or used for matching, so
+ * names another user got the AI to invent never reach this user's prompt or plan.
+ */
+export async function generatePlan(profile: Profile, userId: number, feedback?: string | null): Promise<{ plan: Plan; source: PlanSource }> {
+  const library = await db.query.exercises.findMany({ where: visibleExercises(userId), orderBy: [asc(exercises.name)] });
+  const fallback = deterministicPlan(profile, library);
+  const isFallback = (plan: Plan) => JSON.stringify(plan) === JSON.stringify(fallback);
 
   const candidates = await generateCandidates(profile, library, normalizePlanFeedback(feedback));
-  // Validate first (avoid-list, schedule, names) so Jev judges exactly what the user would see
-  const resolved = candidates.map((candidate) => resolvePlan(candidate, library, profile));
-  if (resolved.length < 2) return resolved[0] ?? deterministicPlan(profile, library);
+  // Validate first (avoid-list, schedule, names, volume) so Jev judges exactly what the user would see
+  const resolved = candidates.map((candidate) => resolvePlan(candidate, library, profile)).filter((plan) => !isFallback(plan));
+  if (resolved.length === 0) return { plan: fallback, source: "fallback" };
+  if (resolved.length === 1) return { plan: resolved[0], source: "ai" };
 
   const scores = await Promise.all(resolved.map((plan, i) => jevScore(`workout_plan#${i + 1}`, { profile: jevProfile(profile), plan }, WORKOUT_QUESTIONS)));
-  return resolved[pickBest(scores)];
-}
-
-export async function generateAndPersistPlan(userId: number, profile: Profile, feedback?: string | null) {
-  const resolved = await generatePlan(profile, feedback);
-  await persistPlan(userId, resolved);
-  return { name: resolved.name, days: resolved.days.length };
+  return { plan: resolved[pickBest(scores)], source: "ai" };
 }
 
 /** Two candidates in parallel (one plan per call), so there are always two for Jev to compare. */
@@ -142,7 +149,7 @@ async function generateCandidates(profile: Profile, library: ExerciseRecord[], f
     if (parsed && !parsed.success) console.warn(`[workout-plan] model output failed schema: ${parsed.error.issues.slice(0, 3).map((i) => `${i.path.join(".")} ${i.message}`).join("; ")}`);
     return parsed?.success ? [parsed.data as Plan] : [];
   });
-  return plans.length ? plans : [deterministicPlan(profile, library)];
+  return plans;
 }
 
 /** Only what Jev needs to judge fit: no free text beyond the (sanitised) avoid note. */
@@ -168,74 +175,56 @@ const WORKOUT_QUESTIONS = {
   },
 };
 
+/**
+ * Saves a confirmed plan as the active routine. New exercise names are created as
+ * this user's private custom exercises, one row per movement across the whole plan
+ * (matched case- and plural-insensitively), so history isn't split.
+ */
 export async function persistPlan(userId: number, plan: Plan) {
   await db.transaction(async (tx) => {
-    await tx
-      .update(routines)
-      .set({ isActive: false, updatedAt: new Date().toISOString() })
-      .where(eq(routines.userId, userId));
-    const [routine] = await tx
-      .insert(routines)
-      .values({ userId, name: plan.name, isActive: true })
-      .returning();
+    const visible = await tx.query.exercises.findMany({ where: visibleExercises(userId) });
+    const byKey = new Map(visible.map((e) => [exerciseKey(e.name), e.id]));
+
+    // One canonical name per movement across all days
+    const canonical = new Map<string, { name: string; category: string; muscle: string }>();
+    for (const day of plan.days) {
+      for (const item of day.exercises) {
+        const key = exerciseKey(item.exercise);
+        if (!byKey.has(key) && !canonical.has(key)) {
+          canonical.set(key, { name: cleanExerciseName(item.exercise), category: item.category ?? "other", muscle: item.muscle ?? "full_body" });
+        }
+      }
+    }
+    const fresh = [...canonical.values()].filter((e) => e.name.length >= 3);
+    if (fresh.length) {
+      await tx
+        .insert(exercises)
+        .values(fresh.map((e) => ({ name: e.name, category: e.category as ExerciseRecordCategory, primaryMuscleGroup: e.muscle, isCustom: true, createdByUserId: userId })))
+        // exercises.name is globally unique: an identical private name from another user is reused by id below
+        .onConflictDoNothing({ target: exercises.name });
+      const rows = await tx.query.exercises.findMany({ where: inArray(exercises.name, fresh.map((e) => e.name)) });
+      for (const row of rows) byKey.set(exerciseKey(row.name), row.id);
+    }
+
+    await tx.update(routines).set({ isActive: false, updatedAt: new Date().toISOString() }).where(eq(routines.userId, userId));
+    const [routine] = await tx.insert(routines).values({ userId, name: plan.name, isActive: true }).returning();
     const weekdays = trainingWeekdays(plan.days.length);
     for (const [dayIndex, day] of plan.days.entries()) {
       const [template] = await tx
         .insert(workoutTemplates)
-        .values({
-          userId,
-          name: day.name,
-          description: "Generated from your onboarding profile.",
-        })
+        .values({ userId, name: day.name, description: "Generated from your onboarding profile." })
         .returning();
-      await tx
-        .insert(routineDays)
-        .values({
-          routineId: routine.id,
-          dayOfWeek: weekdays[dayIndex],
-          templateId: template.id,
-        });
-      // The plan may name exercises the library doesn't have yet: add them so they can be logged.
-      const newOnes = day.exercises.filter(
-        (item) => item.muscle && item.category,
-      );
-      if (newOnes.length) {
-        await tx
-          .insert(exercises)
-          .values(
-            newOnes.map((item) => ({
-              name: item.exercise,
-              category: item.category!,
-              primaryMuscleGroup: item.muscle!,
-              isCustom: true,
-              createdByUserId: userId,
-            })),
-          )
-          .onConflictDoNothing({ target: exercises.name });
-      }
-      const matchingExercises = await tx.query.exercises.findMany({
-        where: or(
-          ...day.exercises.map((item) => eq(exercises.name, item.exercise)),
-        ),
+      await tx.insert(routineDays).values({ routineId: routine.id, dayOfWeek: weekdays[dayIndex], templateId: template.id });
+      const seen = new Set<number>();
+      const values = day.exercises.flatMap((item) => {
+        const exerciseId = byKey.get(exerciseKey(item.exercise));
+        if (!exerciseId || seen.has(exerciseId)) return [];
+        seen.add(exerciseId);
+        return [{ templateId: template.id, exerciseId, orderIndex: seen.size - 1, targetSets: item.sets, targetReps: item.reps }];
       });
-      const values = day.exercises
-        .map((item, index) => {
-          const exercise = matchingExercises.find(
-            (candidate) => candidate.name === item.exercise,
-          );
-          return exercise
-            ? {
-                templateId: template.id,
-                exerciseId: exercise.id,
-                orderIndex: index,
-                targetSets: item.sets,
-                targetReps: item.reps,
-              }
-            : null;
-        })
-        .filter((value): value is NonNullable<typeof value> => value !== null);
-      if (values.length)
-        await tx.insert(workoutTemplateExercises).values(values);
+      if (values.length) await tx.insert(workoutTemplateExercises).values(values);
     }
   });
 }
+
+type ExerciseRecordCategory = (typeof EXERCISE_CATEGORIES)[number];

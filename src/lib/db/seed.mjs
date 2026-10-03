@@ -96,12 +96,17 @@ async function seed() {
 
   const adminEmail = process.env.ADMIN_EMAIL || "admin@gym.local";
   const adminPassword = process.env.ADMIN_PASSWORD || "changeme";
+  // A default password must be changed at first login so a fresh install isn't left open
+  const usingDefaultPassword = adminPassword === "changeme";
+  if (usingDefaultPassword) {
+    console.warn("WARNING: ADMIN_PASSWORD is unset or 'changeme'. Set a strong ADMIN_PASSWORD; the admin must choose a new password at first login.");
+  }
 
   // Check if admin exists
   const existing = await db.run(sql`SELECT id FROM users WHERE email = ${adminEmail} LIMIT 1`);
   if (existing.rows.length === 0) {
     const passwordHash = await hash(adminPassword, 12);
-    await db.run(sql`INSERT INTO users (email, name, password_hash, role, force_password_change, created_at, updated_at) VALUES (${adminEmail}, 'Admin', ${passwordHash}, 'admin', 0, datetime('now'), datetime('now'))`);
+    await db.run(sql`INSERT INTO users (email, name, password_hash, role, force_password_change, created_at, updated_at) VALUES (${adminEmail}, 'Admin', ${passwordHash}, 'admin', ${usingDefaultPassword ? 1 : 0}, datetime('now'), datetime('now'))`);
     console.log(`Admin user created: ${adminEmail}`);
   } else {
     console.log("Admin user already exists, skipping.");

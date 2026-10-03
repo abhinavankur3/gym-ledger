@@ -5,15 +5,23 @@ import { cookies } from "next/headers";
 const SESSION_COOKIE = "session";
 const EXPIRY_DAYS = 7;
 
-type SessionPayload = {
+export type SessionPayload = {
   userId: number;
   role: "admin" | "user";
+  /** Must match users.session_version; bumped on password change/reset to revoke old sessions */
+  sessionVersion?: number;
   expiresAt: string;
 };
 
+let warnedShortSecret = false;
+
 function getSecretKey() {
   const secret = process.env.SESSION_SECRET;
-  if (!secret) throw new Error("SESSION_SECRET is not set");
+  if (!secret) throw new Error("SESSION_SECRET is not set. Generate one with: openssl rand -base64 32");
+  if (secret.length < 32 && !warnedShortSecret) {
+    warnedShortSecret = true;
+    console.warn("[auth] SESSION_SECRET is shorter than 32 characters; use a longer random value (openssl rand -base64 32).");
+  }
   return new TextEncoder().encode(secret);
 }
 
@@ -36,11 +44,11 @@ export async function decrypt(token: string): Promise<SessionPayload | null> {
   }
 }
 
-export async function createSession(userId: number, role: "admin" | "user") {
+export async function createSession(userId: number, role: "admin" | "user", sessionVersion = 0) {
   const expiresAt = new Date(
     Date.now() + EXPIRY_DAYS * 24 * 60 * 60 * 1000
   ).toISOString();
-  const token = await encrypt({ userId, role, expiresAt });
+  const token = await encrypt({ userId, role, sessionVersion, expiresAt });
 
   const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE, token, {

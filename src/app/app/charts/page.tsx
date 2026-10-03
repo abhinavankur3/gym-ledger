@@ -41,93 +41,48 @@ export default async function ChartsPage() {
     orderBy: (a, { asc }) => [asc(a.checkIn)],
   });
 
-  // Volume data (last 4 weeks) - get all sets with exercise info
+  // Volume data (last 4 weeks): one joined query instead of a query per workout and per set
   const fourWeeksAgo = new Date();
   fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28);
-  const recentWorkouts = await db.query.workouts.findMany({
-    where: and(
-      eq(workouts.userId, user.id),
-      gte(workouts.startedAt, fourWeeksAgo.toISOString())
-    ),
-  });
+  const recentSets = await db
+    .select({ weight: workoutSets.weight, reps: workoutSets.reps, muscle: exercises.primaryMuscleGroup })
+    .from(workoutSets)
+    .innerJoin(workouts, eq(workoutSets.workoutId, workouts.id))
+    .innerJoin(exercises, eq(workoutSets.exerciseId, exercises.id))
+    .where(and(eq(workouts.userId, user.id), gte(workouts.startedAt, fourWeeksAgo.toISOString())));
 
   const volumeByMuscle: Record<string, number> = {};
-  for (const workout of recentWorkouts) {
-    const sets = await db.query.workoutSets.findMany({
-      where: eq(workoutSets.workoutId, workout.id),
-    });
-    for (const set of sets) {
-      const exercise = await db.query.exercises.findFirst({
-        where: eq(exercises.id, set.exerciseId),
-      });
-      if (exercise && set.weight && set.reps) {
-        const mg = exercise.primaryMuscleGroup;
-        volumeByMuscle[mg] = (volumeByMuscle[mg] || 0) + set.weight * set.reps;
-      }
-    }
+  for (const set of recentSets) {
+    if (set.weight && set.reps) volumeByMuscle[set.muscle] = (volumeByMuscle[set.muscle] || 0) + set.weight * set.reps;
   }
 
   const volumeData = Object.entries(volumeByMuscle)
     .map(([muscle, volume]) => ({ muscle: muscle.replace("_", " "), volume: Math.round(volume) }))
     .sort((a, b) => b.volume - a.volume);
 
-  // PR data — only for exercises the user has actually logged
-  const userWorkouts = await db.query.workouts.findMany({
-    where: eq(workouts.userId, user.id),
-  });
-  const workoutIds = userWorkouts.map((w) => w.id);
+  // PR history: only this user's PR sets, with exercise names, in one query
+  const prSets = await db
+    .select({ exerciseId: workoutSets.exerciseId, exerciseName: exercises.name, weight: workoutSets.weight, startedAt: workouts.startedAt })
+    .from(workoutSets)
+    .innerJoin(workouts, eq(workoutSets.workoutId, workouts.id))
+    .innerJoin(exercises, eq(workoutSets.exerciseId, exercises.id))
+    .where(and(eq(workouts.userId, user.id), eq(workoutSets.isPr, true)));
 
-  const prExercises: Array<{
-    exerciseId: number;
-    exerciseName: string;
-    bestWeight: number;
-    bestDate: string;
-    history: Array<{ date: string; weight: number }>;
-  }> = [];
-
-  if (workoutIds.length > 0) {
-    // Get all sets with weight for this user's workouts
-    const prSets = await db.query.workoutSets.findMany({
-      where: eq(workoutSets.isPr, true),
-    });
-
-    const byExercise: Record<number, { date: string; weight: number }[]> = {};
-    for (const set of prSets) {
-      if (!workoutIds.includes(set.workoutId) || !set.weight) continue;
-      const workout = userWorkouts.find((w) => w.id === set.workoutId);
-      if (!workout) continue;
-      if (!byExercise[set.exerciseId]) byExercise[set.exerciseId] = [];
-      byExercise[set.exerciseId].push({
-        date: workout.startedAt.split("T")[0],
-        weight: set.weight,
-      });
-    }
-
-    // Build sorted PR list with exercise names
-    for (const [exerciseIdStr, history] of Object.entries(byExercise)) {
-      const exerciseId = Number(exerciseIdStr);
-      const exercise = await db.query.exercises.findFirst({
-        where: eq(exercises.id, exerciseId),
-      });
-      if (!exercise) continue;
-
-      const sorted = history.sort(
-        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-      );
-      const best = sorted.reduce((max, h) => (h.weight > max.weight ? h : max), sorted[0]);
-
-      prExercises.push({
-        exerciseId,
-        exerciseName: exercise.name,
-        bestWeight: best.weight,
-        bestDate: best.date,
-        history: sorted,
-      });
-    }
-
-    // Sort by best weight descending
-    prExercises.sort((a, b) => b.bestWeight - a.bestWeight);
+  const byExercise = new Map<number, { name: string; history: Array<{ date: string; weight: number }> }>();
+  for (const set of prSets) {
+    if (!set.weight) continue;
+    const entry = byExercise.get(set.exerciseId) ?? { name: set.exerciseName, history: [] };
+    entry.history.push({ date: localDateKey(set.startedAt, tz), weight: set.weight });
+    byExercise.set(set.exerciseId, entry);
   }
+
+  const prExercises = [...byExercise.entries()]
+    .map(([exerciseId, { name, history }]) => {
+      const sorted = history.sort((a, b) => a.date.localeCompare(b.date));
+      const best = sorted.reduce((max, h) => (h.weight > max.weight ? h : max), sorted[0]);
+      return { exerciseId, exerciseName: name, bestWeight: best.weight, bestDate: best.date, history: sorted };
+    })
+    .sort((a, b) => b.bestWeight - a.bestWeight);
 
   return (
     <main className="pb-6">

@@ -15,6 +15,10 @@ describe("sanitizeUserText", () => {
     expect(sanitizeUserText("x".repeat(1000), AVOID_MAX)).toHaveLength(300);
   });
 
+  it("strips invisible format characters (zero-width, bidi overrides)", () => {
+    expect(sanitizeUserText("no\u200b squ\u202eats\u2066", FEEDBACK_MAX)).toBe("no squats");
+  });
+
   it("handles empty input", () => {
     expect(sanitizeUserText(null, 10)).toBe("");
     expect(sanitizeUserText(undefined, 10)).toBe("");

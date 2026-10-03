@@ -44,7 +44,8 @@ export default async function AppDashboard() {
   ]);
   const hasMealPlan = !!mealPlan;
 
-  const doneDays = [...new Set(weekWorkouts.map((w) => localWeekday(new Date(w.startedAt), tz)))];
+  // Only finished sessions count as done; an open one shows as "Resume" instead
+  const doneDays = [...new Set(weekWorkouts.filter((w) => w.completedAt).map((w) => localWeekday(new Date(w.startedAt), tz)))];
   const plannedDays = routineWeek.map((d) => d.dayOfWeek);
   const nextDay = routineWeek.find((d) => d.dayOfWeek > today) ?? routineWeek[0];
   const nextInDays = nextDay ? ((nextDay.dayOfWeek - today + 7) % 7 || 7) : null;

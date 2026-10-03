@@ -188,22 +188,32 @@ export function ActiveWorkout({
     navigator.vibrate?.(12);
     setRestEndsAt(restDeadline());
 
+    const rollback = (message: string) => {
+      setLocalDone((prev) => ({ ...prev, [exerciseId]: (prev[exerciseId] ?? []).filter((s) => s.setNumber !== setNumber) }));
+      toast.error(message);
+    };
+
     startTransition(async () => {
-      const result = await addSet(workout.id, exerciseId, {
-        setNumber,
-        setType: "working",
-        weight: values.weight ?? undefined,
-        reps: values.reps ?? undefined,
-        durationSeconds: values.durationSeconds ?? undefined,
-      });
-      setPendingKeys((keys) => keys.filter((k) => k !== key));
-      if (result?.error) {
-        setLocalDone((prev) => ({ ...prev, [exerciseId]: (prev[exerciseId] ?? []).filter((s) => s.setNumber !== setNumber) }));
-        toast.error(result.error);
-        return;
+      try {
+        const result = await addSet(workout.id, exerciseId, {
+          setNumber,
+          setType: "working",
+          weight: values.weight ?? undefined,
+          reps: values.reps ?? undefined,
+          durationSeconds: values.durationSeconds ?? undefined,
+        });
+        if (result?.error) {
+          rollback(result.error);
+          return;
+        }
+        if (result?.isPr) toast.success("New personal record");
+        router.refresh();
+      } catch {
+        // Network or server failure: the set wasn't saved, so don't show it as done
+        rollback("That set wasn't saved. Check your connection and tap again.");
+      } finally {
+        setPendingKeys((keys) => keys.filter((k) => k !== key));
       }
-      if (result?.isPr) toast.success("New personal record");
-      router.refresh();
     });
   }
 
@@ -223,6 +233,20 @@ export function ActiveWorkout({
   function handleRemoveExercise(exerciseId: number) {
     setAddedExerciseIds((prev) => prev.filter((id) => id !== exerciseId));
     setHiddenIds((prev) => [...prev, exerciseId]);
+    // Forget everything shown for it, so re-adding it starts clean (no ghost sets)
+    const prefix = `${exerciseId}:`;
+    setLocalDone((prev) => {
+      const next = { ...prev };
+      delete next[exerciseId];
+      return next;
+    });
+    setExtraRows((prev) => {
+      const next = { ...prev };
+      delete next[exerciseId];
+      return next;
+    });
+    setEdits((prev) => Object.fromEntries(Object.entries(prev).filter(([key]) => !key.startsWith(prefix))));
+    setUndoneIds((prev) => [...prev, ...(setsByExercise[exerciseId] ?? []).map((s) => s.id)]);
     if ((setsByExercise[exerciseId] ?? []).length > 0 || templateIds.includes(exerciseId)) {
       startTransition(async () => {
         await removeExerciseFromWorkout(workout.id, exerciseId);
@@ -299,7 +323,9 @@ export function ActiveWorkout({
           const done = doneSetsFor(exerciseId);
           const count = rowCount(exerciseId, done);
           const range = parseRepRange(info.template?.targetReps);
-          const firstOpen = Array.from({ length: count }, (_, i) => i + 1).find((n) => !done.some((s) => s.setNumber === n));
+          // A finished workout shows only what was logged; gaps aren't tappable rows
+          const setNumbers = isCompleted ? done.map((s) => s.setNumber) : Array.from({ length: count }, (_, i) => i + 1);
+          const firstOpen = isCompleted ? undefined : setNumbers.find((n) => !done.some((s) => s.setNumber === n));
           const exerciseDone = count > 0 && !firstOpen;
 
           return (
@@ -337,7 +363,7 @@ export function ActiveWorkout({
               </div>
 
               <ol className="mt-4 space-y-2">
-                {Array.from({ length: count }, (_, i) => i + 1).map((setNumber) => {
+                {setNumbers.map((setNumber) => {
                   const key = `${exerciseId}:${setNumber}`;
                   const doneSet = done.find((s) => s.setNumber === setNumber);
                   if (doneSet) {

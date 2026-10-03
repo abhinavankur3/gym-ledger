@@ -59,11 +59,27 @@ export function localWeekday(date: Date, timeZone: string) {
   return ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].indexOf(zonedParts(date, timeZone).weekday);
 }
 
+/** Zone offset (ms, local minus UTC) at a given instant. */
+function offsetAt(ms: number, timeZone: string) {
+  const p = zonedParts(new Date(ms), timeZone);
+  return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - Math.floor(ms / 1000) * 1000;
+}
+
+/**
+ * UTC instant of local midnight on a calendar date. Uses the offset *at* that
+ * midnight (re-checked once), so DST change days land on the right hour.
+ */
+function localMidnightMs(year: number, month: number, day: number, timeZone: string) {
+  const wall = Date.UTC(year, month - 1, day);
+  let guess = wall - offsetAt(wall, timeZone);
+  guess = wall - offsetAt(guess, timeZone);
+  return guess;
+}
+
 /** UTC ISO timestamp of the most recent local midnight, for comparing against stored ISO timestamps. */
 export function startOfLocalDayIso(date: Date, timeZone: string) {
   const p = zonedParts(date, timeZone);
-  const offsetMs = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - Math.floor(date.getTime() / 1000) * 1000;
-  return new Date(Date.UTC(p.year, p.month - 1, p.day) - offsetMs).toISOString();
+  return new Date(localMidnightMs(p.year, p.month, p.day, timeZone)).toISOString();
 }
 
 export function greetingForHour(hour: number) {
@@ -74,8 +90,18 @@ export function greetingForHour(hour: number) {
 
 /** UTC ISO timestamp of local midnight on this week's Monday. */
 export function startOfLocalWeekIso(date: Date, timeZone: string) {
-  const weekday = localWeekday(date, timeZone);
-  return startOfLocalDayIso(new Date(date.getTime() - weekday * 24 * 60 * 60 * 1000), timeZone);
+  const p = zonedParts(date, timeZone);
+  const weekday = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].indexOf(p.weekday);
+  // Calendar arithmetic (not 24 h steps), so a DST change mid-week can't skip a day
+  const monday = new Date(Date.UTC(p.year, p.month - 1, p.day - weekday));
+  return new Date(localMidnightMs(monday.getUTCFullYear(), monday.getUTCMonth() + 1, monday.getUTCDate(), timeZone)).toISOString();
+}
+
+/** YYYY-MM-DD for the local calendar day `daysAgo` days before `date`. */
+export function localDateKeyDaysAgo(date: Date, daysAgo: number, timeZone: string) {
+  const p = zonedParts(date, timeZone);
+  const d = new Date(Date.UTC(p.year, p.month - 1, p.day - daysAgo));
+  return d.toISOString().split("T")[0];
 }
 
 /** e.g. "Thursday, 2 October" in the user's zone. */

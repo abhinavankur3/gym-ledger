@@ -124,6 +124,11 @@ async function seed() {
   // Create admin user if not exists
   const adminEmail = process.env.ADMIN_EMAIL || "admin@gym.local";
   const adminPassword = process.env.ADMIN_PASSWORD || "changeme";
+  // A default password must be changed at first login so a fresh install isn't left open
+  const usingDefaultPassword = adminPassword === "changeme";
+  if (usingDefaultPassword) {
+    console.warn("WARNING: ADMIN_PASSWORD is unset or 'changeme'. Set a strong ADMIN_PASSWORD; the admin must choose a new password at first login.");
+  }
 
   const existingAdmin = await db.query.users.findFirst({
     where: eq(schema.users.email, adminEmail),
@@ -136,7 +141,7 @@ async function seed() {
       name: "Admin",
       passwordHash,
       role: "admin",
-      forcePasswordChange: false,
+      forcePasswordChange: usingDefaultPassword,
     });
     console.log(`Admin user created: ${adminEmail}`);
   } else {

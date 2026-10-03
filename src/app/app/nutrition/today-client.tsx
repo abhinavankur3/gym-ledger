@@ -49,7 +49,9 @@ export function TodayMeals({ meals, logs, defaultSlot }: { meals: Meal[]; logs: 
     });
   }
 
-  const extras = logs.filter((l) => l.source !== "plan");
+  // Plan logs whose slot isn't on today's plan (e.g. the plan changed mid-day) must stay visible and deletable
+  const renderedSlots = new Set(meals.map((m) => m.slot));
+  const extras = logs.filter((l) => l.source !== "plan" || !renderedSlots.has(l.slot));
 
   return (
     <div className="space-y-3">
@@ -108,7 +110,7 @@ export function TodayMeals({ meals, logs, defaultSlot }: { meals: Meal[]; logs: 
           <ul className="mt-2 divide-y divide-border">
             {extras.map((l) => (
               <li key={l.id} className="flex items-center gap-3 py-2.5">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted">{l.source === "photo" ? <Camera className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}</span>
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted">{l.source === "photo" ? <Camera className="h-4 w-4" /> : l.source === "plan" ? <Check className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}</span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-semibold">{l.title}</span>
                   <span className="tabular block text-xs text-muted-foreground">{SLOT_LABEL[l.slot]}, {Math.round(l.kcal)} kcal, {Math.round(l.protein)} g protein</span>
@@ -263,6 +265,7 @@ function LogOtherForm({ initialSlot, onDone }: { initialSlot: MealSlot; onDone: 
             placeholder={photo ? "Anything the photo doesn't show? e.g. cooked in ghee, had 2 of these" : "e.g. 2 rotis, a katori of dal and some bhindi"}
             className="min-h-20 w-full resize-y rounded-2xl border border-input bg-card p-3 text-base outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
           />
+          <p className="text-xs text-muted-foreground">Photos are sent to the AI to estimate the meal and aren&apos;t stored.</p>
           {error && <p role="alert" className="rounded-2xl bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">{error}</p>}
           <Button size="lg" className="w-full" onClick={runEstimate} disabled={pending || (!photo && !description.trim())}>
             {pending ? <Loader2 className="h-5 w-5 animate-spin" /> : null} {pending ? "Estimating…" : "Estimate"}

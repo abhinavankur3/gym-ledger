@@ -50,6 +50,13 @@
       "when": 1790970563242,
       "tag": "0006_strange_wild_child",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1791014594239,
+      "tag": "0007_lethal_husk",
+      "breakpoints": true
     }
   ]
 }

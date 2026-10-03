@@ -16,6 +16,7 @@ export async function setThemeCookie(theme: ThemePreference) {
 
 /**
  * Runs before paint when the preference is "system": applies .dark/.light from the
- * OS setting and follows changes, so there's no flash of the wrong theme.
+ * OS setting and follows changes, so there's no flash of the wrong theme. Runs once
+ * per page load, and only acts while <html data-theme="system">.
  */
-export const SYSTEM_THEME_SCRIPT = `(()=>{const m=matchMedia("(prefers-color-scheme: dark)");const a=()=>{const d=document.documentElement;d.classList.toggle("dark",m.matches);d.classList.toggle("light",!m.matches)};a();m.addEventListener("change",a)})()`;
+export const SYSTEM_THEME_SCRIPT = `(()=>{if(window.__kochiTheme)return;window.__kochiTheme=1;const d=document.documentElement,m=matchMedia("(prefers-color-scheme: dark)");const a=()=>{if(d.dataset.theme!=="system")return;d.classList.toggle("dark",m.matches);d.classList.toggle("light",!m.matches)};a();m.addEventListener("change",a)})()`;

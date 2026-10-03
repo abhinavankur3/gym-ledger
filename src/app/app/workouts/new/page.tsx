@@ -52,9 +52,7 @@ export default function NewWorkoutPage() {
     if (!name.trim()) return;
     startTransition(async () => {
       const result = await startWorkout(name.trim());
-      if (result?.workoutId) {
-        router.push(`/app/workouts/${result.workoutId}`);
-      }
+      if ("workoutId" in result) router.push(`/app/workouts/${result.workoutId}`);
     });
   }
 

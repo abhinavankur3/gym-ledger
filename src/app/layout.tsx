@@ -34,7 +34,7 @@ export default async function RootLayout({
 
   return (
     // The system-theme script rewrites the class before hydration
-    <html lang="en" className={`${theme === "system" ? "" : theme} h-full antialiased`} suppressHydrationWarning>
+    <html lang="en" data-theme={theme} className={`${theme === "system" ? "" : theme} h-full antialiased`} suppressHydrationWarning>
       <head>
         <link rel="apple-touch-icon" href="/icon-192x192.png" />
         {theme === "system" && <script dangerouslySetInnerHTML={{ __html: SYSTEM_THEME_SCRIPT }} />}

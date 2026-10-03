@@ -1,4 +1,4 @@
-import { eq, and, asc } from "drizzle-orm";
+import { eq, and, asc, inArray } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/dal";
@@ -11,6 +11,7 @@ import {
 } from "@/lib/db/schema";
 import { ActiveWorkout } from "./active-workout";
 import { getLastPerformance } from "../actions";
+import { visibleExercises } from "@/lib/exercises";
 import { getUserTimeZone } from "@/lib/dates";
 
 export default async function WorkoutDetailPage({
@@ -37,17 +38,14 @@ export default async function WorkoutDetailPage({
 
   // Get exercise details for all exercises used in this workout
   const exerciseIds = [...new Set(sets.map((s) => s.exerciseId))];
-  const exerciseList = await Promise.all(
-    exerciseIds.map((id) =>
-      db.query.exercises.findFirst({ where: eq(exercises.id, id) })
-    )
-  );
-  const exerciseMap = Object.fromEntries(
-    exerciseList.filter(Boolean).map((e) => [e!.id, e!])
-  );
+  const exerciseList = exerciseIds.length
+    ? await db.query.exercises.findMany({ where: inArray(exercises.id, exerciseIds) })
+    : [];
+  const exerciseMap = Object.fromEntries(exerciseList.map((e) => [e.id, e]));
 
-  // Get all exercises for the picker
+  // Exercises the user can pick: the built-in library plus their own
   const allExercises = await db.query.exercises.findMany({
+    where: visibleExercises(user.id),
     orderBy: (exercises, { asc }) => [asc(exercises.primaryMuscleGroup), asc(exercises.name)],
   });
 

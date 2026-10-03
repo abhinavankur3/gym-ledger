@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import Link from "next/link";
 import { Loader2, RefreshCw, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,10 @@ export function ChangePlan() {
       formData.set("feedback", feedback);
       const result = await regeneratePlan(formData);
       if (result?.error) setError(result.error);
-      else router.refresh();
+      else {
+        if ("source" in result && result.source === "fallback") toast("Kochi couldn't reach the AI, so this draft uses a simpler built-in plan.");
+        router.refresh();
+      }
     });
   }
 

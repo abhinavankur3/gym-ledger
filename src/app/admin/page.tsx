@@ -1,3 +1,4 @@
+import { requireAdmin } from "@/lib/auth/dal";
 import { count } from "drizzle-orm";
 import db from "@/lib/db";
 import { users, workouts, gymAttendance } from "@/lib/db/schema";
@@ -5,6 +6,8 @@ import { Users, Dumbbell, CalendarCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default async function AdminDashboard() {
+  // Layouts can be skipped on client navigation, so each admin page checks too
+  await requireAdmin();
   const [userCount] = await db.select({ value: count() }).from(users);
   const [workoutCount] = await db.select({ value: count() }).from(workouts);
   const [attendanceCount] = await db.select({ value: count() }).from(gymAttendance);

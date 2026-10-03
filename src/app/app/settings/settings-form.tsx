@@ -82,7 +82,16 @@ export function SettingsForm({ initialName, initialWeightUnit, initialMeasuremen
 
     startTransition(async () => {
       const result = await updatePreferences(formData);
-      if (result?.success) toast.success("Settings saved");
+      if (result && "error" in result && result.error) {
+        toast.error(String(result.error));
+        return;
+      }
+      if (result?.success) {
+        toast.success("Settings saved");
+        // The theme class lives on <html> (and "system" needs its pre-paint script),
+        // which a soft refresh can't re-run; reload so the new theme applies now
+        if (theme !== initialTheme) window.location.reload();
+      }
     });
   }
 

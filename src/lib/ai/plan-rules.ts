@@ -39,7 +39,41 @@ export function exerciseKey(name: string) {
 
 /** Keeps model-written names to plain, display-safe text. */
 export function cleanExerciseName(name: string) {
-  return name.replace(/<[^>]*>/g, " ").replace(/[^\p{L}\p{N} ()&'/+-]/gu, "").replace(/\s+/g, " ").trim().slice(0, 60);
+  return name.replace(/<[^>]*>/g, " ").replace(/[^\p{L}\p{N} ()&'/+-]/gu, "").replace(/\s+/g, " ").trim().slice(0, 40);
+}
+
+/** Plan and day names written by the model: same charset rules, short. */
+export function cleanPlanLabel(name: string) {
+  return cleanExerciseName(name);
+}
+
+/** Exercises per day by session length, mirroring the fallback plan's pacing. */
+export function maxExercisesFor(sessionMinutes: number) {
+  if (sessionMinutes <= 30) return 4;
+  if (sessionMinutes <= 45) return 5;
+  if (sessionMinutes <= 60) return 6;
+  return 8;
+}
+
+export const MAX_SETS_PER_DAY = 25;
+const DEFAULT_REPS = "8-12";
+
+/** Movements Kochi never programs, whatever the model suggests. */
+const HIGH_RISK = ["behind the neck", "behind-the-neck", "kipping", "jefferson curl", "upright row to chin"];
+
+export function isHighRisk(name: string) {
+  const n = name.toLowerCase();
+  return HIGH_RISK.some((m) => n.includes(m));
+}
+
+/** "8-12", "10", "45s" (timed holds); anything else, or numbers over 100, becomes "8-12". */
+export function sanitizeReps(reps: string) {
+  const value = String(reps ?? "").trim().toLowerCase().replace(/\s+/g, "").replace(/–/g, "-");
+  const match = value.match(/^(\d{1,3})(?:-(\d{1,3}))?(s?)$/);
+  if (!match) return DEFAULT_REPS;
+  const nums = [match[1], match[2]].filter(Boolean).map(Number);
+  if (nums.some((n) => n < 1 || n > 100)) return DEFAULT_REPS;
+  return value;
 }
 
 /**
@@ -53,12 +87,16 @@ export function resolvePlan(plan: Plan, library: ExerciseRecord[], profile: Prof
   const avoidNote = profile.avoidMovements;
   const fallback = deterministicPlan(profile, library);
 
-  const validDays = plan.days.map((day) => {
+  const maxExercises = maxExercisesFor(profile.sessionDuration);
+
+  const validDays = plan.days.map((day, dayIndex) => {
     const seen = new Set<string>();
     const exercises: PlanExercise[] = [];
+    let setsLeft = MAX_SETS_PER_DAY;
     for (const item of day.exercises) {
+      if (exercises.length >= maxExercises || setsLeft < 1) break;
       const name = cleanExerciseName(item.exercise);
-      if (name.length < 3) continue;
+      if (name.length < 3 || isHighRisk(name)) continue;
       const match = known.get(exerciseKey(name));
       const resolved: PlanExercise = match
         ? { ...item, exercise: match.name, muscle: match.primaryMuscleGroup as MuscleGroup, category: match.category as ExerciseCategory }
@@ -66,9 +104,11 @@ export function resolvePlan(plan: Plan, library: ExerciseRecord[], profile: Prof
       const key = exerciseKey(resolved.exercise);
       if (seen.has(key) || avoidedExercises(avoidNote, [resolved.exercise]).size > 0) continue;
       seen.add(key);
-      exercises.push(resolved);
+      const sets = Math.min(Math.max(1, Math.round(Number(item.sets) || 3)), 6, setsLeft);
+      setsLeft -= sets;
+      exercises.push({ ...resolved, sets, reps: sanitizeReps(item.reps) });
     }
-    return { name: day.name, exercises };
+    return { name: cleanPlanLabel(day.name) || `Day ${dayIndex + 1}`, exercises };
   }).filter((day) => day.exercises.length >= 2);
   if (validDays.length < 2) return fallback;
 
@@ -81,7 +121,7 @@ export function resolvePlan(plan: Plan, library: ExerciseRecord[], profile: Prof
     days.push(fallbackDay);
   }
 
-  return days.length === profile.trainingDays ? { ...plan, days } : fallback;
+  return days.length === profile.trainingDays ? { name: cleanPlanLabel(plan.name) || fallback.name, days } : fallback;
 }
 
 export function deterministicPlan(profile: Profile, library: ExerciseRecord[]): Plan {

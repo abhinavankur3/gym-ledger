@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DISHES } from "./dish-catalog";
-import { MEAL_SHARE, PROTEIN_POWDERS, addProteinShake, avoidFoodWords, choosePowder, cleanItem, dayTotal, fallbackMealPlan, resolveMealPlan, scaleDay, violatesDiet, type RawMealPlan } from "./meal-plan";
+import { MEAL_SHARE, PROTEIN_POWDERS, addProteinShake, isSafeDay, mergeSlots, avoidFoodWords, choosePowder, cleanItem, dayTotal, fallbackMealPlan, resolveMealPlan, scaleDay, violatesDiet, type RawMealPlan } from "./meal-plan";
 
 const item = (name: string, kcal = 300, protein = 15, carbs = 40, fat = 8) => ({ name, portion: "1 bowl", kcal, protein, carbs, fat });
 const rawDay = (lunch: string, dinner = "Dal tadka") => ({
@@ -189,5 +189,39 @@ describe("protein shake", () => {
   it("fallback plans get the shake too", () => {
     const p = fallbackMealPlan({ kcal: 2400, protein: 170 }, { preference: "vegetarian" }, { countryCode: "IN" });
     expect(p.days.every((d) => d.meals.some((m) => m.items.some((i) => i.name === "Whey protein shake")))).toBe(true);
+  });
+});
+
+describe("slot merging and day safety", () => {
+  it("merges duplicate slots into one meal", () => {
+    const merged = mergeSlots([
+      { slot: "snack", title: "Fruit", items: [{ ...item("Apple", 80, 0, 20, 0), servings: 1 }] },
+      { slot: "lunch", title: "Dal rice", items: [{ ...item("Dal rice"), servings: 1 }] },
+      { slot: "snack", title: "Chana", items: [{ ...item("Roasted chana", 110, 6, 18, 2), servings: 1 }] },
+    ]);
+    expect(merged.map((m) => m.slot)).toEqual(["lunch", "snack"]);
+    expect(merged[1].items).toHaveLength(2);
+    expect(merged[1].title).toBe("Fruit, Chana");
+  });
+
+  it("resolves a model day with two snacks into a single snack", () => {
+    const day = rawDay("Chole");
+    day.meals.push({ slot: "snack", title: "Fruit", items: [item("Apple", 80, 0, 20, 0)] }, { slot: "snack", title: "Chana", items: [item("Chana", 110, 6, 18, 2)] });
+    const resolved = resolveMealPlan(plan([day, rawDay("Rajma"), rawDay("Dal")]), { kcal: 1800, protein: 0 }, { preference: "none" })!;
+    expect(resolved.days[0].meals.filter((m) => m.slot === "snack")).toHaveLength(1);
+  });
+
+  it("flags days far outside the target", () => {
+    const day = (kcal: number) => ({ meals: [{ slot: "lunch" as const, title: "x", items: [{ ...item("x", kcal, 10, 10, 10), servings: 1 }] }] });
+    expect(isSafeDay(day(1900), { kcal: 2000 })).toBe(true);
+    expect(isSafeDay(day(900), { kcal: 2000 })).toBe(false);
+    expect(isSafeDay(day(2600), { kcal: 2000 })).toBe(false);
+    // Low targets aren't rejected just for being under 1200
+    expect(isSafeDay(day(1150), { kcal: 1250 })).toBe(true);
+  });
+
+  it("rejects a plan when feedback pushes every day far below target", () => {
+    const tiny = (name: string) => ({ meals: [{ slot: "lunch", title: name, items: [item(name, 150, 5, 20, 3)] }, { slot: "dinner", title: name, items: [item(name, 150, 5, 20, 3)] }] });
+    expect(resolveMealPlan(plan([tiny("Soup"), tiny("Salad"), tiny("Broth")]), { kcal: 2400, protein: 0 }, { preference: "none" })).toBeNull();
   });
 });

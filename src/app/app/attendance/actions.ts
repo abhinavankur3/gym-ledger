@@ -1,6 +1,6 @@
 "use server";
 
-import { eq, and, gte, sql, desc } from "drizzle-orm";
+import { eq, and, gte, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import db from "@/lib/db";
 import { gymAttendance } from "@/lib/db/schema";
@@ -59,23 +59,4 @@ export async function checkOut() {
   revalidatePath("/app/attendance");
   revalidatePath("/app");
   return { success: true };
-}
-
-export async function getAttendanceForMonth(year: number, month: number) {
-  const session = await verifySession();
-  const start = `${year}-${String(month).padStart(2, "0")}-01`;
-  const endMonth = month === 12 ? 1 : month + 1;
-  const endYear = month === 12 ? year + 1 : year;
-  const end = `${endYear}-${String(endMonth).padStart(2, "0")}-01`;
-
-  const records = await db.query.gymAttendance.findMany({
-    where: and(
-      eq(gymAttendance.userId, session.userId),
-      gte(gymAttendance.checkIn, start),
-      sql`${gymAttendance.checkIn} < ${end}`
-    ),
-    orderBy: [desc(gymAttendance.checkIn)],
-  });
-
-  return records;
 }

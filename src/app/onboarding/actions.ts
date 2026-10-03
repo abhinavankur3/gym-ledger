@@ -6,6 +6,7 @@ import { planDrafts, userProfiles } from "@/lib/db/schema";
 import { verifySession } from "@/lib/auth/dal";
 import { onboardingSchema } from "@/lib/validators/schemas";
 import { generatePlan } from "@/lib/ai/plan-generator";
+import { isQuotaError, withAiQuota } from "@/lib/ai/quota";
 import { AVOID_MAX, sanitizeUserText } from "@/lib/ai/user-text";
 
 export async function completeOnboarding(_prev: { error?: string } | null, formData: FormData): Promise<{ error?: string } | null> {
@@ -32,16 +33,20 @@ export async function completeOnboarding(_prev: { error?: string } | null, formD
     return { error: field ? `Please check your ${String(field).replace(/([A-Z])/g, " $1").toLowerCase()} and try again.` : "Please complete each step to continue." };
   }
 
+  // Explicit nulls: an emptied avoid field must clear the saved value (undefined is skipped on update)
+  const profile = { ...parsed.data, restrictions: parsed.data.restrictions ?? null, avoidMovements: parsed.data.avoidMovements ?? null };
   await db.insert(userProfiles).values({
     userId: session.userId,
-    ...parsed.data,
+    ...profile,
     updatedAt: new Date().toISOString(),
   }).onConflictDoUpdate({
     target: userProfiles.userId,
-    set: { ...parsed.data, updatedAt: new Date().toISOString() },
+    set: { ...profile, updatedAt: new Date().toISOString() },
   });
 
-  const plan = await generatePlan(parsed.data);
+  const generated = await withAiQuota(session.userId, "workout_plan", () => generatePlan(profile, session.userId));
+  if (isQuotaError(generated)) return { error: generated.error };
+  const { plan } = generated;
   await db.insert(planDrafts).values({
     userId: session.userId,
     planJson: JSON.stringify(plan),

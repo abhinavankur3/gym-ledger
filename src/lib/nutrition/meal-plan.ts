@@ -195,6 +195,29 @@ export function finishDay(day: MealDay, targets: Pick<NutritionTargets, "kcal" |
   return addProteinShake(scaleDay(day, targets.kcal * MEAL_SHARE), targets.protein, rules);
 }
 
+/**
+ * A finished day (meals + shake) must land in a sane range: not below max(1200 kcal,
+ * 70% of target) — capped at 90% of target so low targets aren't rejected outright —
+ * and not above 120% of target. Stops "500 kcal fasting day" feedback or bloated
+ * model days from reaching the user.
+ */
+export function isSafeDay(day: MealDay, targets: Pick<NutritionTargets, "kcal">) {
+  const total = dayTotal(day).kcal;
+  const floor = Math.min(Math.max(1200, targets.kcal * 0.7), targets.kcal * 0.9);
+  return total >= floor && total <= targets.kcal * 1.2;
+}
+
+/** One meal per slot: duplicate slots (two snacks) are merged so logging by slot is unambiguous. */
+export function mergeSlots(meals: Meal[]): Meal[] {
+  const bySlot = new Map<MealSlot, Meal>();
+  for (const meal of meals) {
+    const existing = bySlot.get(meal.slot);
+    if (!existing) bySlot.set(meal.slot, { ...meal, items: [...meal.items] });
+    else bySlot.set(meal.slot, { slot: meal.slot, title: cleanLabel(`${existing.title}, ${meal.title}`, 80), items: [...existing.items, ...meal.items] });
+  }
+  return MEAL_SLOTS.filter((slot) => bySlot.has(slot)).map((slot) => bySlot.get(slot)!);
+}
+
 // ---------------------------------------------------------------- resolve
 
 /** Validates a model plan; returns null when it's unusable so the caller falls back. */
@@ -215,15 +238,17 @@ export function resolveMealPlan(raw: RawMealPlan, targets: Pick<NutritionTargets
         .filter((i): i is MealItem => !!i && !isProteinPowder(i.name) && !violatesDiet(i.name, rules, avoidWords));
       if (items.length) meals.push({ slot, title: title || items.map((i) => i.name).join(", "), items });
     }
-    meals.sort((a, b) => MEAL_SLOTS.indexOf(a.slot) - MEAL_SLOTS.indexOf(b.slot));
-    const hasMain = meals.some((m) => m.slot === "lunch" || m.slot === "dinner");
-    if (meals.length >= 2 && hasMain) days.push({ meals });
+    const merged = mergeSlots(meals);
+    const hasMain = merged.some((m) => m.slot === "lunch" || m.slot === "dinner");
+    if (merged.length >= 2 && hasMain) days.push({ meals: merged });
   }
 
-  if (days.length < 3) return null;
+  // Finish (scale + shake) each distinct day, then keep only days in a safe calorie range
+  const finished = days.map((d) => finishDay(d, targets, rules)).filter((d) => isSafeDay(d, targets));
+  if (finished.length < 3) return null;
   // Short weeks repeat the valid days in order to make seven
-  const week = Array.from({ length: 7 }, (_, i) => days[i % days.length]);
-  return { name: cleanLabel(String(raw.name ?? ""), 60) || "Your meal plan", days: week.map((d) => finishDay(d, targets, rules)) };
+  const week = Array.from({ length: 7 }, (_, i) => finished[i % finished.length]);
+  return { name: cleanLabel(String(raw.name ?? ""), 60) || "Your meal plan", days: week };
 }
 
 // ---------------------------------------------------------------- fallback
@@ -274,7 +299,7 @@ export function fallbackMealPlan(targets: Pick<NutritionTargets, "kcal" | "prote
     const dinner = [...pick(proteinMains.slice(0, Math.max(3, Math.ceil(proteinMains.length / 3))), 1, day + 2), ...pick(mains, 2, day * 2 + 5)];
     const dinnerUnique = dinner.filter((d, i) => dinner.indexOf(d) === i).slice(0, 3);
     if (dinnerUnique.length) meals.push({ slot: "dinner", title: dinnerUnique.map((d) => d.name).join(", "), items: dinnerUnique.map(dishToItem) });
-    return finishDay({ meals }, targets, rules);
+    return finishDay({ meals: mergeSlots(meals) }, targets, rules);
   });
 
   return { name: region === "IN" ? "Everyday Indian plan" : "Everyday plan", days };

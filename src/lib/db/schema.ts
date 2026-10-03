@@ -8,6 +8,8 @@ export const users = sqliteTable("users", {
   passwordHash: text("password_hash").notNull(),
   role: text("role", { enum: ["admin", "user"] }).notNull().default("user"),
   forcePasswordChange: integer("force_password_change", { mode: "boolean" }).notNull().default(true),
+  /** Bumped on password change/reset; sessions carrying an older version are rejected */
+  sessionVersion: integer("session_version").notNull().default(0),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
 });
@@ -47,15 +49,19 @@ export const workoutTemplates = sqliteTable("workout_templates", {
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
 });
 
-export const workoutTemplateExercises = sqliteTable("workout_template_exercises", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  templateId: integer("template_id").notNull().references(() => workoutTemplates.id, { onDelete: "cascade" }),
-  exerciseId: integer("exercise_id").notNull().references(() => exercises.id),
-  orderIndex: integer("order_index").notNull(),
-  targetSets: integer("target_sets"),
-  targetReps: text("target_reps"), // e.g., "8-12"
-  targetWeight: real("target_weight"),
-});
+export const workoutTemplateExercises = sqliteTable(
+  "workout_template_exercises",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    templateId: integer("template_id").notNull().references(() => workoutTemplates.id, { onDelete: "cascade" }),
+    exerciseId: integer("exercise_id").notNull().references(() => exercises.id),
+    orderIndex: integer("order_index").notNull(),
+    targetSets: integer("target_sets"),
+    targetReps: text("target_reps"), // e.g., "8-12"
+    targetWeight: real("target_weight"),
+  },
+  (table) => [index("idx_template_exercises_template").on(table.templateId)]
+);
 
 export const workouts = sqliteTable(
   "workouts",
@@ -92,6 +98,8 @@ export const workoutSets = sqliteTable(
   },
   (table) => [
     index("idx_sets_workout_exercise").on(table.workoutId, table.exerciseId),
+    // PR checks and last-performance lookups filter by exercise across workouts
+    index("idx_sets_exercise").on(table.exerciseId),
   ]
 );
 
@@ -152,21 +160,29 @@ export const planDrafts = sqliteTable("plan_drafts", {
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
 });
 
-export const routines = sqliteTable("routines", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  isActive: integer("is_active", { mode: "boolean" }).notNull().default(false),
-  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
-  updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
-});
+export const routines = sqliteTable(
+  "routines",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    isActive: integer("is_active", { mode: "boolean" }).notNull().default(false),
+    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+    updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
+  },
+  (table) => [index("idx_routines_user_active").on(table.userId, table.isActive)]
+);
 
-export const routineDays = sqliteTable("routine_days", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  routineId: integer("routine_id").notNull().references(() => routines.id, { onDelete: "cascade" }),
-  dayOfWeek: integer("day_of_week").notNull(), // 0=Monday ... 6=Sunday
-  templateId: integer("template_id").notNull().references(() => workoutTemplates.id, { onDelete: "cascade" }),
-});
+export const routineDays = sqliteTable(
+  "routine_days",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    routineId: integer("routine_id").notNull().references(() => routines.id, { onDelete: "cascade" }),
+    dayOfWeek: integer("day_of_week").notNull(), // 0=Monday ... 6=Sunday
+    templateId: integer("template_id").notNull().references(() => workoutTemplates.id, { onDelete: "cascade" }),
+  },
+  (table) => [index("idx_routine_days_routine").on(table.routineId)]
+);
 
 // Drizzle relations for relational query builder
 export const workoutTemplatesRelations = relations(workoutTemplates, ({ many, one }) => ({
@@ -234,4 +250,16 @@ export const mealLogs = sqliteTable(
     createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
   },
   (table) => [index("idx_meal_logs_user_date").on(table.userId, table.date)]
+);
+
+/** AI calls per user, for daily quotas (plan generation, meal plans, food estimates). */
+export const aiUsage = sqliteTable(
+  "ai_usage",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["workout_plan", "meal_plan", "food_estimate"] }).notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [index("idx_ai_usage_user_kind_created").on(table.userId, table.kind, table.createdAt)]
 );

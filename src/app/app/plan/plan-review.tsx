@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Check, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -31,7 +32,10 @@ export function PlanReview({ plan, feedback: initialFeedback }: { plan: Plan; fe
       formData.set("feedback", feedback);
       const result = await regeneratePlan(formData);
       if (result?.error) setError(result.error);
-      else router.refresh();
+      else {
+        if ("source" in result && result.source === "fallback") toast("Kochi couldn't reach the AI, so this draft uses a simpler built-in plan.");
+        router.refresh();
+      }
     });
   }
 
