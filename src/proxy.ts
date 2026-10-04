@@ -3,7 +3,7 @@ import { decrypt } from "@/lib/auth/session";
 
 // "/" is the public landing page: it always renders, signed in or not
 const PUBLIC_ROUTES = ["/", "/login", "/change-password"];
-const STATIC_PREFIXES = ["/_next", "/icon-", "/sw.js", "/manifest", "/favicon.ico"];
+const STATIC_PREFIXES = ["/_next", "/icon", "/apple-icon", "/sw.js", "/manifest", "/favicon.ico"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

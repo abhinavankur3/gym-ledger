@@ -10,5 +10,5 @@ echo "Running database seed..."
 node src/lib/db/seed.mjs
 
 # Start the application
-echo "Starting Gym Ledger..."
+echo "Starting Kochi..."
 exec node server.js

@@ -4,11 +4,11 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Kochi",
     short_name: "Kochi",
-    description: "Your training log, plan and progress in one place",
+    description: "Your coach for training and food",
     start_url: "/app",
     display: "standalone",
-    background_color: "#14171c",
-    theme_color: "#14171c",
+    background_color: "#10143a",
+    theme_color: "#10143a",
     orientation: "portrait",
     icons: [
       {
@@ -22,7 +22,7 @@ export default function manifest(): MetadataRoute.Manifest {
         type: "image/png",
       },
       {
-        src: "/icon-512x512.png",
+        src: "/icon-maskable-512x512.png",
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",

@@ -1,6 +1,6 @@
 // Bump to purge caches written by older workers.
-const CACHE_NAME = "gym-ledger-v2";
-const STATIC_ASSETS = ["/icon-192x192.png", "/icon-512x512.png"];
+const CACHE_NAME = "kochi-v1";
+const STATIC_ASSETS = ["/icon-192x192.png", "/icon-512x512.png", "/icon-maskable-512x512.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
