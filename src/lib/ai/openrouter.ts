@@ -16,6 +16,36 @@ type JsonCall = {
 
 const MAX_IMAGE_DATA_URL = 2_000_000;
 
+/**
+ * Explains a failed fetch. Node reports network problems as a bare
+ * "TypeError: fetch failed" and keeps the real reason (DNS, TLS, timeout,
+ * refused connection) on `error.cause`, so unwrap it for the logs.
+ */
+export function describeFetchError(error: unknown): string {
+  if (!(error instanceof Error)) return "unknown error";
+  const parts = [`${error.name} ${error.message.slice(0, 160)}`];
+  let cause: unknown = (error as { cause?: unknown }).cause;
+  for (let depth = 0; cause && depth < 3; depth++) {
+    const c = cause as { code?: string; syscall?: string; hostname?: string; address?: string; message?: string; errors?: unknown[]; cause?: unknown };
+    const detail = [c.code, c.syscall, c.hostname ?? c.address].filter(Boolean).join(" ");
+    parts.push(`cause: ${detail || ""}${c.message ? ` (${String(c.message).slice(0, 160)})` : ""}`.trim());
+    // Happy-eyeballs connection failures arrive as an AggregateError with one error per address
+    if (Array.isArray(c.errors) && c.errors.length) {
+      parts.push(
+        `attempts: ${c.errors
+          .slice(0, 4)
+          .map((e) => {
+            const x = e as { code?: string; address?: string; port?: number };
+            return [x.code, x.address && `${x.address}:${x.port ?? ""}`].filter(Boolean).join(" ");
+          })
+          .join("; ")}`
+      );
+    }
+    cause = c.cause;
+  }
+  return parts.join(" | ");
+}
+
 let warnedNoModel = false;
 
 /** Accepts only base64 data URLs for common image types, within the upload limit. */
@@ -119,7 +149,7 @@ export async function openRouterJson({
   } catch (error) {
     // Never log request content or keys; only what went wrong
     console.warn(
-      `[openrouter] ${name}: ${model} failed after ${Date.now() - started} ms: ${error instanceof Error ? error.name + " " + error.message.slice(0, 200) : "unknown error"}`,
+      `[openrouter] ${name}: ${model} failed after ${Date.now() - started} ms: ${describeFetchError(error)}`,
     );
     return null;
   }
@@ -168,7 +198,7 @@ export async function jevScore(name: string, state: unknown, questions: Record<s
     console.info(`[jev] ${name}: ${model} ok in ${Date.now() - started} ms, scores ${Object.entries(scores).map(([k, v]) => `${k}=${v.toFixed(2)}`).join(" ")}`);
     return scores;
   } catch (error) {
-    console.warn(`[jev] ${name}: ${model} failed after ${Date.now() - started} ms: ${error instanceof Error ? error.name + " " + error.message.slice(0, 200) : "unknown error"}`);
+    console.warn(`[jev] ${name}: ${model} failed after ${Date.now() - started} ms: ${describeFetchError(error)}`);
     return null;
   }
 }

@@ -8,9 +8,18 @@ services:
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@gym.local}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme}
       - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET is required}
+      # Optional: AI plans, meal plans and food photo estimates (built-in fallbacks are used without a key)
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - OPENROUTER_GENERATION_MODEL=${OPENROUTER_GENERATION_MODEL:-qwen/qwen3.7-flash}
+      - OPENROUTER_DECISION_MODEL=${OPENROUTER_DECISION_MODEL:-typesafe/jev-1.13}
     volumes:
       - gym-data:/app/data
     restart: unless-stopped
+    # If AI calls log "EAI_AGAIN"/"ENOTFOUND" (container can't resolve openrouter.ai),
+    # point the container at public resolvers:
+    # dns:
+    #   - 1.1.1.1
+    #   - 8.8.8.8
 
 volumes:
   gym-data:
