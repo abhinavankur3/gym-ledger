@@ -35,7 +35,8 @@ const planExerciseSchema = z.object({
   muscle: z.enum(MUSCLE_GROUPS),
   category: z.enum(EXERCISE_CATEGORIES),
   sets: z.number().int().min(1).max(6),
-  reps: z.string().min(1).max(12),
+  // Wordy rep text is normalised by sanitizeReps in resolvePlan rather than failing the whole plan
+  reps: z.string().min(1).max(60),
   rir: z.number().min(0).max(5).default(2),
 });
 
@@ -107,7 +108,7 @@ const PLAN_JSON_SCHEMA = {
                 muscle: { type: "string", enum: [...MUSCLE_GROUPS] },
                 category: { type: "string", enum: [...EXERCISE_CATEGORIES] },
                 sets: { type: "integer" },
-                reps: { type: "string" },
+                reps: { type: "string", description: 'A rep range like "8-12", a single count like "10", or seconds for holds like "45s". No other words.' },
                 rir: { type: "number" },
               },
               required: ["exercise", "muscle", "category", "sets", "reps", "rir"],

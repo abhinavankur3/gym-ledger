@@ -66,14 +66,18 @@ export function isHighRisk(name: string) {
   return HIGH_RISK.some((m) => n.includes(m));
 }
 
-/** "8-12", "10", "45s" (timed holds); anything else, or numbers over 100, becomes "8-12". */
+/**
+ * "8-12", "10", "45s" (timed holds). Wordy model output keeps its leading range
+ * ("8-10 per side" → "8-10", "30-45 seconds" → "30-45s"); anything else, or numbers
+ * over 100, becomes "8-12".
+ */
 export function sanitizeReps(reps: string) {
-  const value = String(reps ?? "").trim().toLowerCase().replace(/\s+/g, "").replace(/–/g, "-");
-  const match = value.match(/^(\d{1,3})(?:-(\d{1,3}))?(s?)$/);
+  const value = String(reps ?? "").trim().toLowerCase().replace(/[–—]|\bto\b/g, "-").replace(/\s*-\s*/g, "-");
+  const match = value.match(/^(\d{1,3})(?:-(\d{1,3}))?\s*(s\b|secs?\b|seconds?\b)?/);
   if (!match) return DEFAULT_REPS;
   const nums = [match[1], match[2]].filter(Boolean).map(Number);
   if (nums.some((n) => n < 1 || n > 100)) return DEFAULT_REPS;
-  return value;
+  return `${nums.join("-")}${match[3] ? "s" : ""}`;
 }
 
 /**

@@ -167,6 +167,10 @@ describe("workout safety limits", () => {
     expect(sanitizeReps("12 – 15")).toBe("12-15");
     expect(sanitizeReps("to failure")).toBe("8-12");
     expect(sanitizeReps("500")).toBe("8-12");
+    expect(sanitizeReps("8-10 per side")).toBe("8-10");
+    expect(sanitizeReps("30-45 seconds")).toBe("30-45s");
+    expect(sanitizeReps("12 reps each leg")).toBe("12");
+    expect(sanitizeReps("10 to 12")).toBe("10-12");
   });
 
   it("drops high-risk movements", () => {
